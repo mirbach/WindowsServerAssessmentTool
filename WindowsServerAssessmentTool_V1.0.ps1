@@ -12,90 +12,6 @@
     Prerequisite   : PowerShell 5.1 or later, Administrator privileges for some checks
 #>
 
-# ============================================================================
-# DIGITAL SIGNATURE BLOCK - DO NOT MODIFY
-# ============================================================================
-<#
-.DIGITAL_SIGNATURE
-    Script Name         : WindowsServerAssessmentTool_V1.0.ps1
-    Author              : Abdullah Zmaili
-    Version             : 1.0
-    Creation Date       : 2025-06-16
-    Last Modified       : 2025-06-17
-    File Size           : 1761 lines
-    PowerShell Version  : 5.1+
-    
-    Security Hash (SHA256):
-    Generated on: 2025-06-17 at runtime
-    
-    Script Integrity Verification:
-    - Original Author: Abdullah Zmaili
-    - Authorized Modifications: Collapsible HTML sections added
-    - Security Features: Menu-driven data collection, selective reporting
-    - Purpose: Windows Server comprehensive assessment and health monitoring
-    
-    Certificate Information:
-    - Issuer: Self-Signed (Development/Internal Use)
-    - Valid From: 2025-06-16
-    - Valid To: 2026-06-16
-    - Key Algorithm: SHA256withRSA
-    
-    Usage Rights:
-    - Internal organizational use permitted
-    - Modification permitted with proper attribution
-    - Distribution requires author consent
-    - Commercial use requires licensing agreement
-    
-    Validation Commands:
-    To verify script integrity, run:
-    Get-FileHash "WindowsServerAssessmentTool_V1.0.ps1" -Algorithm SHA256
-    
-    Expected Characteristics:
-    - Menu-driven interface with 5 collection modes
-    - Generates HTML report with collapsible sections
-    - Exports data to individual CSV files
-    - Requires Administrator privileges for full functionality
-    - Compatible with Windows Server 2012+ and Windows 10+
-    
-    Change Log:
-    v1.0 (2025-06-16) - Initial release with basic health check functionality
-    v1.0.1 (2025-06-17) - Added collapsible HTML sections for better UX
-    
-    Digital Signature Verification:
-    This signature block serves as a tamper-evident seal. Any modifications
-    to the script content above this signature block may indicate unauthorized
-    changes. Always verify the source and integrity before execution.
-    
-    Support Contact: Abdullah Zmaili
-    Last Integrity Check: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
-#>
-
-# Runtime signature generation (for integrity checking)
-$ScriptPath = $PSCommandPath
-if ($ScriptPath) {
-    try {
-        $ScriptHash = Get-FileHash $ScriptPath -Algorithm SHA256 -ErrorAction SilentlyContinue
-        $ScriptSize = (Get-Item $ScriptPath -ErrorAction SilentlyContinue).Length
-        
-        Write-Host "`n" -NoNewline
-        Write-Host "=== SCRIPT INTEGRITY VERIFICATION ===" -ForegroundColor Magenta
-        Write-Host "Script Hash (SHA256): " -NoNewline -ForegroundColor Yellow
-        Write-Host "$($ScriptHash.Hash)" -ForegroundColor Green
-        Write-Host "File Size: " -NoNewline -ForegroundColor Yellow  
-        Write-Host "$ScriptSize bytes" -ForegroundColor Green
-        Write-Host "Verification Time: " -NoNewline -ForegroundColor Yellow
-        Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')" -ForegroundColor Green
-        Write-Host "Digital Signature: " -NoNewline -ForegroundColor Yellow
-        Write-Host "VALID - Self-Signed Internal Use" -ForegroundColor Green
-        Write-Host "========================================" -ForegroundColor Magenta
-    } catch {
-        Write-Warning "Unable to generate runtime signature verification"
-    }
-}
-
-# End of Digital Signature Block
-# ============================================================================
-
 # === Prompt user for the directory to save the files ===
 $path = Read-Host "Enter the full path (without filename) to save the reports (e.g., C:\temp)"
 
@@ -1318,7 +1234,7 @@ function Get-TasksStartupLogsInformation {
     $startDate = (Get-Date).AddDays(-7)
 
     # === Get System logs ===
-    Write-Host "   - Processing System logs..." -ForegroundColor Gray
+    Write-Host "  - Processing System logs..." -ForegroundColor Gray
     try {
         $Systemlogs = Get-WinEvent  -FilterHashtable @{
             LogName = 'System'
