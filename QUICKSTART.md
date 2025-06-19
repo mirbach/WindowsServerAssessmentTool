@@ -6,6 +6,14 @@
 3. **Execute:** `.\WindowsServerAssessmentTool_V1.0.ps1`
 4. **Enter output path** (e.g., `C:\temp`)
 5. **Select assessment mode** (1-5)
+6. **Open HTML report** in modern browser for interactive navigation
+
+## Key Features
+- 🎨 **Modern HTML Interface** with collapsible navigation
+- 📊 **Interactive Dashboard** with executive summary
+- 🎯 **Targeted Assessment Modes** for focused analysis
+- 📁 **Professional CSV Exports** for detailed data
+- 📱 **Responsive Design** optimized for desktop/tablet
 
 ## Menu Options
 | Option | Mode | Description |
@@ -19,23 +27,23 @@
 ## Output Files by Assessment Mode
 
 ### Mode 1: System Information Assessment
-- **HTML:** `[Server]-SystemReport.html`
+- **HTML:** `[Server]-SystemReport.html` (Interactive navigation with System sections)
 - **CSV Files:** OSInfo, CPUInfo, RAMInfo, DiskInfo, Services, Programs, Updates
 
 ### Mode 2: Network Assessment  
-- **HTML:** `[Server]-SystemReport.html`
+- **HTML:** `[Server]-SystemReport.html` (Interactive navigation with Network sections)
 - **CSV Files:** NICInfo, TrafficInfo, OpenPorts
 
 ### Mode 3: Security Assessment
-- **HTML:** `[Server]-SystemReport.html`
+- **HTML:** `[Server]-SystemReport.html` (Interactive navigation with Security sections)
 - **CSV Files:** AVSettings, FirewallStatus, LocalAdmins, Certificates, etc.
 
 ### Mode 4: Tasks & Logs Assessment
-- **HTML:** `[Server]-SystemReport.html`
+- **HTML:** `[Server]-SystemReport.html` (Interactive navigation with Tasks/Logs sections)
 - **CSV Files:** StartupProgs, ScheduledTasks, EventLogs
 
 ### Mode 5: All Sections
-- **HTML:** `[Server]-SystemReport.html`
+- **HTML:** `[Server]-SystemReport.html` (Full interactive navigation with all sections)
 - **CSV Files:** All applicable files from modes 1-4
 
 ## Common Issues & Solutions
@@ -58,3 +66,16 @@
 - PowerShell 5.1+
 - Administrator privileges
 - Appropriate execution policy
+
+## HTML Report Features
+- **Collapsible Navigation:** Click sections to expand/collapse content
+- **Interactive Menu:** Left sidebar with icons and section counters
+- **Executive Summary:** Visual dashboard with key metrics
+- **Professional Styling:** Modern gradients, animations, and responsive design
+- **Browser Compatibility:** Optimized for Chrome, Firefox, Edge, Safari
+
+## Navigation Tips
+- **Expand Sections:** Click main sections to view subsections
+- **Quick Access:** Use left navigation menu for instant section jumping  
+- **Toggle Menu:** Click navigation toggle to expand/collapse sidebar
+- **Print-Friendly:** Report is optimized for both screen and print viewing

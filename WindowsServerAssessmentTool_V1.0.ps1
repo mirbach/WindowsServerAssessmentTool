@@ -130,6 +130,73 @@ if ($collectSystemOnly) {
 Write-Host "`nStarting data collection..." -ForegroundColor Cyan
 Start-Sleep -Seconds 2
 
+function Get-IconHTML {
+    <#
+    .SYNOPSIS
+        Helper function to get HTML icon symbols
+    .PARAMETER IconName
+        Name of the icon
+    #>
+    param(
+        [string]$IconName
+    )
+    
+    # Return simple HTML symbols/characters based on icon name
+    switch ($IconName) {
+        'chart' { return '<span class="icon-emoji">&#128202;</span>' }
+        'clipboard' { return '<span class="icon-emoji">&#128203;</span>' }
+        'building' { return '<span class="icon-emoji">&#127970;</span>' }
+        'computer' { return '<span class="icon-emoji">&#128187;</span>' }
+        'server' { return '<span class="icon-emoji">&#128421;</span>' }
+        'gear' { return '<span class="icon-emoji">&#9881;</span>' }
+        'search' { return '<span class="icon-emoji">&#128269;</span>' }
+        'globe' { return '<span class="icon-emoji">&#127760;</span>' }
+        'network' { return '<span class="icon-emoji">&#127760;</span>' }
+        'folder' { return '<span class="icon-emoji">&#128193;</span>' }
+        'users' { return '<span class="icon-emoji">&#128101;</span>' }
+        'user' { return '<span class="icon-emoji">&#128100;</span>' }
+        'database' { return '<span class="icon-emoji">&#128451;</span>' }
+        'file' { return '<span class="icon-emoji">&#128196;</span>' }
+        'lock' { return '<span class="icon-emoji">&#128274;</span>' }
+        'key' { return '<span class="icon-emoji">&#128273;</span>' }
+        'shield' { return '<span class="icon-emoji">&#128737;</span>' }
+        'crown' { return '<span class="icon-emoji">&#128081;</span>' }
+        'package' { return '<span class="icon-emoji">&#128230;</span>' }
+        'plug' { return '<span class="icon-emoji">&#128268;</span>' }
+        'lightning' { return '<span class="icon-emoji">&#9889;</span>' }
+        'wrench' { return '<span class="icon-emoji">&#128295;</span>' }
+        'clock' { return '<span class="icon-emoji">&#128336;</span>' }
+        'hospital' { return '<span class="icon-emoji">&#127973;</span>' }
+        'refresh' { return '<span class="icon-emoji">&#128260;</span>' }
+        'target' { return '<span class="icon-emoji">&#127919;</span>' }
+        'folder2' { return '<span class="icon-emoji">&#128194;</span>' }
+        'memory' { return '<span class="icon-emoji">&#129504;</span>' }
+        'disk' { return '<span class="icon-emoji">&#128190;</span>' }
+        'cpu' { return '<span class="icon-emoji">&#128421;</span>' }
+        'process' { return '<span class="icon-emoji">&#9881;</span>' }
+        'service' { return '<span class="icon-emoji">&#128295;</span>' }
+        'update' { return '<span class="icon-emoji">&#128260;</span>' }
+        'program' { return '<span class="icon-emoji">&#128230;</span>' }
+        'port' { return '<span class="icon-emoji">&#128268;</span>' }
+        'firewall' { return '<span class="icon-emoji">&#128293;</span>' }
+        'antivirus' { return '<span class="icon-emoji">&#128737;</span>' }
+        'certificate' { return '<span class="icon-emoji">&#128196;</span>' }
+        'dns' { return '<span class="icon-emoji">&#127760;</span>' }
+        'audit' { return '<span class="icon-emoji">&#128202;</span>' }
+        'task' { return '<span class="icon-emoji">&#128203;</span>' }
+        'startup' { return '<span class="icon-emoji">&#128640;</span>' }
+        'log' { return '<span class="icon-emoji">&#128221;</span>' }
+        'eye' { return '<span class="icon-emoji">&#128065;</span>' }
+        'home' { return '<span class="icon-emoji">&#127968;</span>' }
+        'info' { return '<span class="icon-emoji">&#8505;</span>' }
+        'menu' { return '<span class="icon-emoji">&#9776;</span>' }
+        'warning' { return '<span class="icon-emoji">&#9888;</span>' }
+        'check' { return '<span class="icon-emoji">&#9989;</span>' }
+        'cross' { return '<span class="icon-emoji">&#10060;</span>' }
+        default { return '<span class="icon-emoji">&#8226;</span>' }
+    }
+}
+
 # ----------------------------
 # 1. SYSTEM INFORMATION
 # ----------------------------
@@ -336,15 +403,21 @@ function Get-SystemInformation {
         Write-Warning "Failed to collect Windows Services: $($_.Exception.Message)"
         $htmlSections['RunningServices'] = "<h2>Running Windows Services</h2><p>Error collecting running services</p>"
         $htmlSections['StoppedServices'] = "<h2>Stopped Windows Services</h2><p>Error collecting stopped services</p>"
-    }
-
-    # === Installed Programs ===
+    }    # === Installed Programs ===
     Write-Host "Collecting Installed Programs..." -ForegroundColor Yellow
     try {
-        $installedprogs = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
-        $installedprogsAll = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object *
+        # Get installed programs from both 32-bit and 64-bit registry locations
+        $installedprogs32 = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
+        $installedprogs64 = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
+        
+        # Combine both lists and remove duplicates based on DisplayName
+        $installedprogsAll = @($installedprogs32) + @($installedprogs64) | Sort-Object DisplayName -Unique
+        
+        # Select only relevant fields and filter out empty entries
+        $installedprogs = $installedprogsAll | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
+        
         $csvinstalledprogsinfo = Join-Path -Path $Path -ChildPath "$ServerName-InstalledProgs.csv"
-        $installedprogsAll | Export-Csv -Path $csvinstalledprogsinfo -NoTypeInformation
+        $installedprogs | Export-Csv -Path $csvinstalledprogsinfo -NoTypeInformation
         $htmlSections['InstalledPrograms'] = $installedprogs | ConvertTo-Html -Fragment -PreContent "<h2>Programs Installed</h2>"
         Write-Host "Installed Programs - Completed" -ForegroundColor Green
     } catch {
@@ -580,7 +653,7 @@ function Get-SecurityInformation {
 
     # === Antivirus ===
     Write-Host "Collecting Antivirus Settings..." -ForegroundColor Yellow
-    $AVsettings = Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, AntispywareEnabled,  IoavProtectionEnabled, AntivirusSignatureLastUpdated, AntispywareSignatureLastUpdated, FullScanAge, FullScanStartTime, FullScanEndTime, QuickScanAge, QuickScanStartTime, QuickScanEndTime
+    $AVsettings = Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, AntispywareEnabled,  IoavProtectionEnabled, AntivirusSignatureLastUpdated, AntispywareSignatureLastUpdated, FullScanStartTime, FullScanEndTime, QuickScanStartTime, QuickScanEndTime
     $AVsettingsAll = Get-MpComputerStatus | Select-Object *
     $AVsettingsAll | Export-Csv -Path $CsvAVSettings -NoTypeInformation
     $AVsettingsHtml = $AVsettings | ConvertTo-Html -Fragment -PreContent "<h2>Anti-Virus Settings</h2>"
@@ -1306,6 +1379,8 @@ if ($collectSystemOnly) {
     $trafficInfoHtml = ""
     $openportsHtml = ""
     $AVsettingsHtml = ""
+   
+   
     $FWstatusHtml = ""
     $FWSettingsHtml = ""
     $SMBv1Html = ""
@@ -1313,7 +1388,7 @@ if ($collectSystemOnly) {
     $localAdminsHtml = ""
     $passwordPolicyHtml = ""
     $sharesHtml = ""
-       $auditSettingsHtml = ""
+    $auditSettingsHtml = ""
     $TLSregSettingsHtml = ""
     $uacHtml = ""
     $psExecPolicyHtml = ""
@@ -1465,198 +1540,1211 @@ $reportScope = if ($collectSystemOnly) {
     "Complete Health Check (All Sections - 36 sections)" 
 }
 
+# Pre-generate all required icons
+Write-Host "Loading icons..." -ForegroundColor Yellow
+$iconChart = Get-IconHTML -IconName 'chart'
+$iconClipboard = Get-IconHTML -IconName 'clipboard'
+$iconComputer = Get-IconHTML -IconName 'computer'
+$iconServer = Get-IconHTML -IconName 'server'
+$iconGear = Get-IconHTML -IconName 'gear'
+$iconShield = Get-IconHTML -IconName 'shield'
+$iconNetwork = Get-IconHTML -IconName 'network'
+$iconLock = Get-IconHTML -IconName 'lock'
+$iconKey = Get-IconHTML -IconName 'key'
+$iconUser = Get-IconHTML -IconName 'user'
+$iconUsers = Get-IconHTML -IconName 'users'
+$iconFolder = Get-IconHTML -IconName 'folder'
+$iconFile = Get-IconHTML -IconName 'file'
+$iconDatabase = Get-IconHTML -IconName 'database'
+$iconClock = Get-IconHTML -IconName 'clock'
+$iconWarning = Get-IconHTML -IconName 'warning'
+$iconCheck = Get-IconHTML -IconName 'check'
+$iconCross = Get-IconHTML -IconName 'cross'
+$iconLightning = Get-IconHTML -IconName 'lightning'
+$iconWrench = Get-IconHTML -IconName 'wrench'
+$iconSearch = Get-IconHTML -IconName 'search'
+$iconRefresh = Get-IconHTML -IconName 'refresh'
+$iconTarget = Get-IconHTML -IconName 'target'
+$iconMemory = Get-IconHTML -IconName 'memory'
+$iconDisk = Get-IconHTML -IconName 'disk'
+$iconCpu = Get-IconHTML -IconName 'cpu'
+$iconProcess = Get-IconHTML -IconName 'process'
+$iconService = Get-IconHTML -IconName 'service'
+$iconUpdate = Get-IconHTML -IconName 'update'
+$iconProgram = Get-IconHTML -IconName 'program'
+$iconPort = Get-IconHTML -IconName 'port'
+$iconFirewall = Get-IconHTML -IconName 'firewall'
+$iconAntivirus = Get-IconHTML -IconName 'antivirus'
+$iconCertificate = Get-IconHTML -IconName 'certificate'
+$iconDns = Get-IconHTML -IconName 'dns'
+$iconAudit = Get-IconHTML -IconName 'audit'
+$iconTask = Get-IconHTML -IconName 'task'
+$iconStartup = Get-IconHTML -IconName 'startup'
+$iconLog = Get-IconHTML -IconName 'log'
+$iconEye = Get-IconHTML -IconName 'eye'
+$iconHome = Get-IconHTML -IconName 'home'
+$iconInfo = Get-IconHTML -IconName 'info'
+$iconMenu = Get-IconHTML -IconName 'menu'
+Write-Host "Icons loaded successfully" -ForegroundColor Green
+
 $fullHtml = @"
 <!DOCTYPE html>
 <html>
 <head>
     <title>$reportTitle for Windows Server</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; padding: 20px; }
-        h1 { color:rgb(231, 255, 107); }
-        h2 { color: #0033cc; }
-        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        th, td { padding: 10px; text-align: left; border: 1px solid #ddd; }
-        th { background-color: #0078D7; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        tr:hover { background-color: #d0e7ff; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
-        /* Collapsible Section Styles */
-        .collapsible {
-            background-color: #0078D7;
-            color: white;
-            cursor: pointer;
-            padding: 18px;
-            width: 100%;
-            border: none;
-            text-align: left;
-            outline: none;
+        /* Icon Styles */
+        .icon-emoji {
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        
+        .nav-item .icon-emoji, .nav-submenu-item .icon-emoji {
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .section-header .icon-emoji, .subsection-header .icon-emoji {
+            margin-right: 10px;
             font-size: 18px;
-            font-weight: bold;
-            margin: 10px 0 5px 0;
-            border-radius: 5px;
-            transition: 0.3s;
         }
         
-        .collapsible:hover {
-            background-color: #005a9e;
+        h2 .icon-emoji {
+            font-size: 20px;
         }
         
-        .collapsible:after {
-            content: 'Expand'; /* Unicode character for "+" */
+        h3 .icon-emoji {
+            font-size: 16px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #f8f9fa; 
+            line-height: 1.6;
+        }
+        
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #0078D7 0%, #005a9e 100%);
             color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .header-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .header-info p {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin: 0;
+        }
+        
+        /* Layout Container */
+        .container {
+            display: flex;
+            min-height: calc(100vh - 140px);
+        }
+        
+        /* Left Navigation Menu */
+        .nav-menu {
+            width: 320px;
+            background: #2d3748;
+            color: white;
+            padding: 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-menu.collapsed {
+            width: 60px;
+        }
+        
+        .nav-toggle {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-size: 16px;
             font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-toggle:hover {
+            background: #3182ce;
+        }
+        
+        .nav-toggle:after {
+            content: '\25C0';
             float: right;
-            margin-left: 5px;
+            transition: transform 0.3s;
         }
         
-        .collapsible.active:after {
-            content: "Collapse "; /* Unicode character for "-" */
+        .nav-menu.collapsed .nav-toggle:after {
+            transform: rotate(180deg);
         }
         
-        .content {
-            padding: 0 18px;
+        .nav-items {
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-menu.collapsed .nav-items {
+            opacity: 0;
+        }
+        
+        .nav-item {
+            border-bottom: 1px solid #4a5568;
+        }
+        
+        .nav-item a {
+            display: block;
+            padding: 15px 20px;
+            color: #e2e8f0;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .nav-item a:hover {
+            background: #4a5568;
+            color: white;
+            padding-left: 25px;
+        }
+        
+        .nav-item.active a {
+            background: #4299e1;
+            color: white;
+            border-left: 4px solid #63b3ed;
+        }
+        
+        /* Sub-section styles */
+        .nav-item.has-submenu > a:after {
+            content: '\25B6';
+            float: right;
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+        
+        .nav-item.has-submenu.expanded > a:after {
+            transform: rotate(90deg);
+        }
+        
+        .nav-submenu {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.2s ease-out;
-            background-color: #f1f1f1;
-            border-radius: 0 0 5px 5px;
+            transition: max-height 0.3s ease;
+            background: #1a202c;
         }
         
-        .content.active {
-            max-height: none;
-            padding: 18px;
+        .nav-item.expanded .nav-submenu {
+            max-height: 500px;
         }
         
-        .section-summary {
-            color: #fbff56;
+        .nav-submenu-item {
+            border-bottom: 1px solid #2d3748;
+        }
+        
+        .nav-submenu-item a {
+            padding: 12px 40px;
             font-size: 14px;
-            margin-left: 10px;
+            color: #cbd5e0;
+            background: transparent;
         }
-    </style>    <script>
-        function toggleCollapsible(element) {
-            element.classList.toggle("active");
-            var content = element.nextElementSibling;
-            if (content.style.maxHeight) {
-                content.style.maxHeight = null;
-                content.classList.remove("active");
-            } else {
-                content.style.maxHeight = content.scrollHeight + "px";
-                content.classList.add("active");
+        
+        .nav-submenu-item a:hover {
+            background: #2d3748;
+            color: white;
+            padding-left: 45px;
+        }
+        
+        .nav-submenu-item.active a {
+            background: #2b77e6;
+            color: white;
+            border-left: 3px solid #63b3ed;
+        }
+        
+        .section-count {
+            float: right;
+            background: #4299e1;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            background: white;
+            margin: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        /* Summary Cards */
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .summary-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .summary-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .summary-label {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+        
+        /* Section Styles */
+        .section {
+            margin-bottom: 30px;
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .subsection {
+            margin-bottom: 25px;
+            display: none;
+        }
+        
+        .subsection.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #0078D7 0%, #005a9e 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            margin-bottom: 0;
+        }
+        
+        .section-header h2 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        
+        .subsection-header {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            margin-top: 20px;
+        }
+        
+        .subsection-header:first-child {
+            margin-top: 0;
+        }
+        
+        .subsection-header h3 {
+            margin: 0;
+            font-size: 1.3em;
+        }
+        
+        .section-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 20px;
+        }
+        
+        .subsection-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 15px 20px;
+        }
+        
+        /* Table Styles */
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th, td { 
+            padding: 12px 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        th { 
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        
+        tr:nth-child(even) { 
+            background-color: #f8f9fa; 
+        }
+        
+        tr:hover { 
+            background-color: #e3f2fd; 
+            transition: background-color 0.2s;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .nav-menu {
+                width: 100%;
+                order: 2;
+            }
+            
+            .main-content {
+                order: 1;
+                margin: 10px;
+            }
+            
+            .summary-grid {
+                grid-template-columns: 1fr;
             }
         }
         
-        // Initialize collapsible sections when page loads
+        /* Footer */
+        .footer {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .footer-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .footer-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .footer-item strong {
+            color: #63b3ed;
+        }
+    </style>
+    
+    <script>
+        // Navigation functionality
         document.addEventListener('DOMContentLoaded', function() {
-            var collapsibles = document.getElementsByClassName('collapsible');
-            for (var i = 0; i < collapsibles.length; i++) {
-                collapsibles[i].addEventListener('click', function() {
-                    toggleCollapsible(this);
+            // Toggle navigation menu
+            const navToggle = document.querySelector('.nav-toggle');
+            const navMenu = document.querySelector('.nav-menu');
+            
+            navToggle.addEventListener('click', function() {
+                navMenu.classList.toggle('collapsed');
+            });
+            
+            // Handle main section and sub-section navigation
+            const navLinks = document.querySelectorAll('.nav-item a, .nav-submenu-item a');
+            const sections = document.querySelectorAll('.section');
+            const subsections = document.querySelectorAll('.subsection');
+            
+            // Show summary section by default
+            document.getElementById('summary').classList.add('active');
+            document.querySelector('[data-section="summary"]').parentElement.classList.add('active');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const sectionId = this.getAttribute('data-section');
+                    const subsectionId = this.getAttribute('data-subsection');
+                    
+                    // Handle submenu toggle for main section links with submenus
+                    if (this.parentElement.classList.contains('has-submenu') && !subsectionId) {
+                        this.parentElement.classList.toggle('expanded');
+                        return;
+                    }
+                    
+                    // Remove active class from all nav items and sections
+                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                    document.querySelectorAll('.nav-submenu-item').forEach(item => item.classList.remove('active'));
+                    sections.forEach(s => s.classList.remove('active'));
+                    subsections.forEach(s => s.classList.remove('active'));
+                    
+                    // Show the main section
+                    const targetSection = document.getElementById(sectionId);
+                    if (targetSection) {
+                        targetSection.classList.add('active');
+                    }
+                    
+                    // Handle subsection navigation
+                    if (subsectionId) {
+                        // Add active class to the submenu item
+                        this.parentElement.classList.add('active');
+                        
+                        // Make sure the parent menu is expanded
+                        const parentNavItem = this.closest('.nav-item.has-submenu');
+                        if (parentNavItem) {
+                            parentNavItem.classList.add('expanded');
+                        }
+                        
+                        // Hide all subsections in the target section
+                        const targetSectionSubsections = targetSection.querySelectorAll('.subsection');
+                        targetSectionSubsections.forEach(sub => sub.classList.remove('active'));
+                        
+                        // Show the specific subsection
+                        const targetSubsection = document.getElementById(subsectionId);
+                        if (targetSubsection) {
+                            targetSubsection.classList.add('active');
+                        }
+                    } else {
+                        // If no subsection specified, show all subsections in the section
+                        const targetSectionSubsections = targetSection.querySelectorAll('.subsection');
+                        targetSectionSubsections.forEach(sub => sub.classList.add('active'));
+                        
+                        // Add active class to the main nav item
+                        this.parentElement.classList.add('active');
+                    }
+                    
+                    // Scroll to top of main content
+                    document.querySelector('.main-content').scrollTop = 0;
                 });
-                
-                // Expand the first section by default
-                if (i === 0) {
-                    collapsibles[i].classList.add("active");
-                    var content = collapsibles[i].nextElementSibling;
-                    content.style.maxHeight = content.scrollHeight + "px";
-                    content.classList.add("active");
-                }
+            });
+            
+            // Auto-expand first menu item with submenus on load
+            const firstSubmenu = document.querySelector('.nav-item.has-submenu');
+            if (firstSubmenu) {
+                firstSubmenu.classList.add('expanded');
             }
         });
     </script>
 </head>
 <body>
-    <h1 style="color:rgb(172, 0, 230);">$reportTitle</h1>
-    <p style="color:rgb(0, 102, 0);">Generated on $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")</p>
-    <p style="color:blue;">Host Name: $(hostname)</p>
-    <p style="color:blue;">User Logged: $(whoami)</p>    <p style="color:blue;">Report Scope: $reportScope</p>
-
+    <div class="header">
+        <h1>$reportTitle</h1>
+        <div class="header-info">
+            <p><strong>Generated:</strong> $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")</p>
+            <p><strong>Host Name:</strong> $(hostname)</p>
+            <p><strong>User:</strong> $(whoami)</p>
+            <p><strong>Scope:</strong> $reportScope</p>
+        </div>
+    </div>
     
+    <div class="container">
+        <nav class="nav-menu">
+            <button class="nav-toggle">$iconMenu Navigation Menu</button>
+            <div class="nav-items">
+                <div class="nav-item">
+                    <a href="#" data-section="summary">$iconClipboard Executive Summary</a>
+                </div>
 "@
 
-# Add core system information sections (OS, CPU, Memory, Disk) if not network-only, not security-only, and not tasks-only
+# Build navigation menu based on selected sections
 if (-not $collectNetworkOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly) {
     $systemSectionCount = 13
     $fullHtml += @"
-    <button type="button" class="collapsible">SYSTEM INFORMATION <span class="section-summary">($systemSectionCount sections)</span></button>
-    <div class="content">
-    $osInfoHtml
-    $uptimeHtml
-    $cpuInfoHtml
-    $cpuusageInfoHtml
-    $RAMHtml
-    $diskInfoHtml
+                <div class="nav-item has-submenu">
+                    <a href="#" data-section="system-info">$iconComputer System Information <span class="section-count">$systemSectionCount</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="os-info">$iconServer Operating System</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="uptime">$iconClock System Uptime</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="cpu-info">$iconCpu CPU Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="cpu-usage">$iconChart CPU Usage</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="memory">$iconMemory Memory Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="disk">$iconDisk Disk Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="programs">$iconProgram Installed Programs</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="updates">$iconCheck Installed Updates</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="missing-updates">$iconWarning Missing Updates</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="processes">$iconProcess Running Processes</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="running-services">$iconService Running Services</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="stopped-services">$iconCross Stopped Services</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="features">$iconGear Windows Features</a>
+                        </div>
+                    </div>
+                </div>
 "@
 }
 
-# Add additional system information sections only if not network-only, not security-only, and not tasks-only
-if (-not $collectNetworkOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly) {
-    $fullHtml += @"
-    $installedprogsHtml
-    $updatesHtml
-    $missingupdatesHtml
-    $CurrentProcessesHtml
-    $runningHtml
-    $stoppedHtml
-    $FeaturesHtml
-    </div>
-"@
-}
-
-# Add network sections if network-only or all sections
 if ($collectNetworkOnly -or (-not $collectSystemOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly)) {
     $networkSectionCount = 3
     $fullHtml += @"
-    <button type="button" class="collapsible">NETWORK INFORMATION <span class="section-summary">($networkSectionCount sections)</span></button>
-    <div class="content">
-    $nicInfoHtml
-    $trafficInfoHtml
-    $openportsHtml
-    </div>
+                <div class="nav-item has-submenu">
+                    <a href="#" data-section="network-info">$iconNetwork Network Information <span class="section-count">$networkSectionCount</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="network-info" data-subsection="network-interfaces">$iconNetwork Network Interfaces</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="network-info" data-subsection="traffic">$iconChart Traffic Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="network-info" data-subsection="open-ports">$iconPort Open Ports</a>
+                        </div>
+                    </div>
+                </div>
 "@
 }
 
-# Add security sections if security-only or all sections
 if ($collectSecurityOnly -or (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectTasksOnly)) {
     $securitySectionCount = 17
     $fullHtml += @"
-    <button type="button" class="collapsible">SECURITY INFORMATION <span class="section-summary">($securitySectionCount sections)</span></button>
-    <div class="content">
-    $SMBv1Html
-    $passwordPolicyHtml
-    $inactiveAccountsHtml
-    $localAdminsHtml
-    $TLSregSettingsHtml
-    $uacHtml
-    $AVsettingsHtml
-    $FWstatusHtml
-    $FWSettingsHtml
-    $psExecPolicyHtml
-    $rdpSecurityHtml
-    $certificatesHtml
-    $dnsSettingsHtml
-    $defenderASRHtml
-    $exploitSettingsHtml
-    $sharesHtml
-    $auditSettingsHtml
-    </div>
+                <div class="nav-item has-submenu">
+                    <a href="#" data-section="security-info">$iconShield Security Information <span class="section-count">$securitySectionCount</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="smbv1">$iconWarning SMBv1 Status</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="password-policy">$iconKey Password Policy</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="inactive-accounts">$iconUser Inactive Accounts</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="local-admins">$iconUsers Local Administrators</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="tls-settings">$iconLock TLS Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="uac">$iconShield UAC Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="antivirus">$iconAntivirus Antivirus Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="firewall-status">$iconFirewall Firewall Status</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="firewall-settings">$iconGear Firewall Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="ps-policy">$iconGear PowerShell Policy</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="rdp-security">$iconLock RDP Security</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="certificates">$iconCertificate Certificates</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="dns-settings">$iconDns DNS Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="defender-asr">$iconShield Defender ASR</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="exploit-protection">$iconShield Exploit Protection</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="shares">$iconFolder SMB Shares</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="audit-settings">$iconAudit Audit Settings</a>
+                        </div>
+                    </div>
+                </div>
 "@
 }
 
-# Add tasks sections only if all sections (not system-only, not network-only, not security-only)
 if (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecurityOnly) {
     $tasksSectionCount = 3
     $fullHtml += @"
-    <button type="button" class="collapsible">TASKS, STARTUP & LOGS INFORMATION <span class="section-summary">($tasksSectionCount sections)</span></button>
-    <div class="content">
-    $eventlogHtml
-    $startupprogsHtml
-    $ScheduledTasksHtml
-    </div>
+                <div class="nav-item has-submenu">
+                    <a href="#" data-section="tasks-logs">$iconTask Tasks, Startup & Logs <span class="section-count">$tasksSectionCount</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="tasks-logs" data-subsection="event-logs">$iconLog Event Logs</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="tasks-logs" data-subsection="startup-programs">$iconStartup Startup Programs</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="tasks-logs" data-subsection="scheduled-tasks">$iconTask Scheduled Tasks</a>
+                        </div>
+                    </div>
+                </div>
 "@
 }
 
-# Close HTML
+# Close navigation menu and start main content
 $fullHtml += @"
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <!-- Executive Summary Section -->
+            <div id="summary" class="section">
+                <div class="summary-card">
+                    <h2 style="color: white; margin-bottom: 20px;">$iconChart Windows Server Assessment Summary</h2>
+                    <div class="summary-grid">
+"@
+
+# Add summary items based on selected sections
+if (-not $collectNetworkOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly) {
+    $fullHtml += @"
+                        <div class="summary-item">
+                            <span class="summary-number">13</span>
+                            <span class="summary-label">System Sections</span>
+                        </div>
+"@
+}
+
+if ($collectNetworkOnly -or (-not $collectSystemOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly)) {
+    $fullHtml += @"
+                        <div class="summary-item">
+                            <span class="summary-number">3</span>
+                            <span class="summary-label">Network Sections</span>
+                        </div>
+"@
+}
+
+if ($collectSecurityOnly -or (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectTasksOnly)) {
+    $fullHtml += @"
+                        <div class="summary-item">
+                            <span class="summary-number">17</span>
+                            <span class="summary-label">Security Sections</span>
+                        </div>
+"@
+}
+
+if (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecurityOnly) {
+    $fullHtml += @"
+                        <div class="summary-item">
+                            <span class="summary-number">3</span>
+                            <span class="summary-label">Tasks & Logs</span>
+                        </div>
+"@
+}
+
+$fullHtml += @"
+                        <div class="summary-item">
+                            <span class="summary-number">1</span>
+                            <span class="summary-label">HTML Report</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section-header">
+                    <h2>$iconClipboard Assessment Overview</h2>
+                </div>
+                <div class="section-content">
+                    <p>This comprehensive Windows Server assessment report provides detailed analysis across multiple categories. The report includes both technical configuration details and security posture analysis.</p>
+                    <br>
+                    <h3>$iconFolder Report Components:</h3>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>Interactive HTML Report:</strong> This comprehensive report with collapsible navigation</li>
+                        <li><strong>CSV Data Files:</strong> Individual CSV files for data analysis and integration</li>
+                        <li><strong>Assessment Categories:</strong> Covering System, Network, Security, and Tasks</li>
+                    </ul>
+                    <br>
+                    <h3>$iconTarget Key Areas Assessed:</h3>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>System configuration and performance metrics</li>
+                        <li>Network interface configuration and traffic</li>
+                        <li>Security settings and policies</li>
+                        <li>User accounts and access controls</li>
+                        <li>Services and scheduled tasks</li>
+                        <li>Event logs and system monitoring</li>
+                    </ul>
+                </div>
+            </div>
+"@
+
+# Add content sections based on selection
+if (-not $collectNetworkOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly) {
+    $fullHtml += @"
+            
+            <!-- System Information Section -->
+            <div id="system-info" class="section">
+                <div class="section-header">
+                    <h2>$iconComputer System Information</h2>
+                </div>
+                <div class="section-content">
+                    <div id="os-info" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconServer Operating System Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $osInfoHtml
+                        </div>
+                    </div>
+                    
+                    <div id="uptime" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconClock System Uptime</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $uptimeHtml
+                        </div>
+                    </div>
+                    
+                    <div id="cpu-info" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconCpu CPU Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $cpuInfoHtml
+                        </div>
+                    </div>
+                    
+                    <div id="cpu-usage" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconChart CPU Usage</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $cpuusageInfoHtml
+                        </div>
+                    </div>
+                    
+                    <div id="memory" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconMemory Memory Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $RAMHtml
+                        </div>
+                    </div>
+                    
+                    <div id="disk" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconDisk Disk Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $diskInfoHtml
+                        </div>
+                    </div>
+                    
+                    <div id="programs" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconProgram Installed Programs</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $installedprogsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="updates" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconCheck Installed Updates</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $updatesHtml
+                        </div>
+                    </div>
+                    
+                    <div id="missing-updates" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconWarning Missing Updates</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $missingupdatesHtml
+                        </div>
+                    </div>
+                    
+                    <div id="processes" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconProcess Running Processes</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $CurrentProcessesHtml
+                        </div>
+                    </div>
+                    
+                    <div id="running-services" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconService Running Services</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $runningHtml
+                        </div>
+                    </div>
+                    
+                    <div id="stopped-services" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconCross Stopped Services</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $stoppedHtml
+                        </div>
+                    </div>
+                    
+                    <div id="features" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconGear Windows Features</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $FeaturesHtml
+                        </div>
+                    </div>
+                </div>
+            </div>
+"@
+}
+
+if ($collectNetworkOnly -or (-not $collectSystemOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly)) {
+    $fullHtml += @"
+            
+            <!-- Network Information Section -->
+            <div id="network-info" class="section">
+                <div class="section-header">
+                    <h2>$iconNetwork Network Information</h2>
+                </div>
+                <div class="section-content">
+                    <div id="network-interfaces" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconNetwork Network Interfaces</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $nicInfoHtml
+                        </div>
+                    </div>
+                    
+                    <div id="traffic" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconChart Traffic Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $trafficInfoHtml
+                        </div>
+                    </div>
+                    
+                    <div id="open-ports" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconPort Open Ports</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $openportsHtml
+                        </div>
+                    </div>
+                </div>
+            </div>
+"@
+}
+
+if ($collectSecurityOnly -or (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectTasksOnly)) {
+    $fullHtml += @"
+            
+            <!-- Security Information Section -->
+            <div id="security-info" class="section">
+                <div class="section-header">
+                    <h2>$iconShield Security Information</h2>
+                </div>
+                <div class="section-content">
+                    <div id="smbv1" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconWarning SMBv1 Status</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $SMBv1Html
+                        </div>
+                    </div>
+                    
+                    <div id="password-policy" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconKey Password Policy</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $passwordPolicyHtml
+                        </div>
+                    </div>
+                    
+                    <div id="inactive-accounts" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconUser Inactive Accounts</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $inactiveAccountsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="local-admins" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconUsers Local Administrators</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $localAdminsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="tls-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconLock TLS Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $TLSregSettingsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="uac" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconShield UAC Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $uacHtml
+                        </div>
+                    </div>
+                    
+                    <div id="antivirus" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconAntivirus Antivirus Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $AVsettingsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="firewall-status" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconFirewall Firewall Status</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $FWstatusHtml
+                        </div>
+                    </div>
+                    
+                    <div id="firewall-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconGear Firewall Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $FWSettingsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="ps-policy" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconGear PowerShell Execution Policy</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $psExecPolicyHtml
+                        </div>
+                    </div>
+                    
+                    <div id="rdp-security" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconLock RDP Security</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $rdpSecurityHtml
+                        </div>
+                    </div>
+                    
+                    <div id="certificates" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconCertificate Certificates</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $certificatesHtml
+                        </div>
+                    </div>
+                    
+                    <div id="dns-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconDns DNS Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $dnsSettingsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="defender-asr" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconShield Defender ASR Rules</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $defenderASRHtml
+                        </div>
+                    </div>
+                    
+                    <div id="exploit-protection" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconShield Exploit Protection</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $exploitSettingsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="shares" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconFolder SMB Shares</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $sharesHtml
+                        </div>
+                    </div>
+                    
+                    <div id="audit-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconAudit Audit Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $auditSettingsHtml
+                        </div>
+                    </div>
+                </div>
+            </div>
+"@
+}
+
+if (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecurityOnly) {
+    $fullHtml += @"
+            
+            <!-- Tasks, Startup & Logs Section -->
+            <div id="tasks-logs" class="section">
+                <div class="section-header">
+                    <h2>$iconTask Tasks, Startup & Logs</h2>
+                </div>
+                <div class="section-content">
+                    <div id="event-logs" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconLog Event Logs</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $eventlogHtml
+                        </div>
+                    </div>
+                    
+                    <div id="startup-programs" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconStartup Startup Programs</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $startupprogsHtml
+                        </div>
+                    </div>
+                    
+                    <div id="scheduled-tasks" class="subsection">
+                        <div class="subsection-header">
+                            <h3>$iconTask Scheduled Tasks</h3>
+                        </div>
+                        <div class="subsection-content">
+                            $ScheduledTasksHtml
+                        </div>
+                    </div>
+                </div>
+            </div>
+"@
+}
+
+# Close main content and add footer
+$fullHtml += @"
+        </main>
+    </div>
+    
+    <div class="footer">
+        <div class="footer-info">
+            <div class="footer-item">
+                <strong>Report Generated:</strong><br>
+                $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+            </div>
+            <div class="footer-item">
+                <strong>Assessment Tool:</strong><br>
+                Windows Server Assessment Tool V1.0
+            </div>
+            <div class="footer-item">
+                <strong>Created By:</strong><br>
+                Abdullah Zmaili
+            </div>
+            <div class="footer-item">
+                <strong>Server Assessed:</strong><br>
+                $(hostname)
+            </div>
+        </div>
+    </div>
     
 </body>
 </html>

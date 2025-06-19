@@ -1,7 +1,14 @@
 # Windows Server Assessment Tool
 
 ## Overview
-The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShell tool designed to perform detailed assessments on Windows Server systems. It provides a menu-driven interface that allows users to selectively collect different types of system information and generate detailed HTML reports with corresponding CSV data exports.
+The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShell tool designed to perform detailed assessments on Windows Server systems. It features a modern, collapsible HTML interface with interactive navigation and provides a menu-driven selection system that allows users to selectively collect different types of system information. The tool generates professional HTML reports with corresponding CSV data exports for in-depth analysis.
+
+## Key Features
+- **Modern Interactive HTML Reports**: Collapsible left navigation menu with icons and smooth animations
+- **Menu-Driven Assessment Modes**: Five targeted assessment options for focused data collection
+- **Professional UI/UX**: Responsive design with color-coded sections and hover effects
+- **Comprehensive CSV Exports**: Detailed data files for external analysis and reporting
+- **Modular Architecture**: Efficient function-based design for optimal performance
 
 ## Version Information
 - **File Name:** WindowsServerAssessmentTool_V1.0.ps1
@@ -11,6 +18,27 @@ The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShel
 - **Prerequisites:** PowerShell 5.1 or later, Administrator privileges for comprehensive assessments
 
 ## Features
+
+### Interactive HTML Report Features
+The generated HTML reports include:
+
+1. **Modern Collapsible Navigation**
+   - Left-aligned navigation menu with icon indicators
+   - Expandable/collapsible sections for organized content
+   - Smooth animations and professional styling
+   - Section counters showing number of assessment areas
+
+2. **Professional User Interface**
+   - Responsive design optimized for desktop and tablet viewing
+   - Color-coded sections with gradient backgrounds
+   - Hover effects and smooth transitions
+   - Executive summary dashboard with key metrics
+
+3. **Interactive Content Organization**
+   - Clickable navigation for instant section access
+   - Subsection organization for detailed information
+   - Search-friendly content structure
+   - Print-optimized styling
 
 ### Menu-Driven Selection
 The script offers five distinct assessment modes:
@@ -138,10 +166,13 @@ The script generates targeted CSV files based on the selected assessment mode:
 
 #### HTML Assessment Report Structure
 The HTML assessment report includes:
+- **Executive Summary Dashboard:** Key metrics overview with visual indicators
+- **Interactive Navigation Menu:** Collapsible left sidebar with icons and section counters
+- **Modern Styling:** Professional gradient backgrounds, hover effects, and responsive design
+- **Section-Based Organization:** Content organized by assessment areas with expandable subsections
+- **Comprehensive Data Presentation:** Detailed information in professionally styled tables
 - **Header Information:** Server name, generation timestamp, logged user, assessment scope
-- **Section-Specific Content:** Only includes sections relevant to the selected assessment mode
-- **Styled Tables:** Professional formatting with hover effects and color coding
-- **Comprehensive Data:** Detailed information presented in an easy-to-read format
+- **Print-Friendly Layout:** Optimized for both screen viewing and printing
 
 #### CSV Files
 - Each CSV file contains raw data for specific system components
@@ -149,6 +180,14 @@ The HTML assessment report includes:
 - Only relevant CSV files are generated based on the selected assessment mode
 
 ## Script Architecture
+
+### Modern HTML Interface
+The script generates HTML reports with:
+- **Collapsible Navigation Menu:** Modern left-aligned sidebar with smooth animations
+- **Interactive Elements:** Clickable sections with hover effects and transitions
+- **Professional Styling:** Gradient backgrounds, icon integration, and responsive design
+- **JavaScript Functionality:** Dynamic content switching and navigation management
+- **CSS3 Features:** Modern styling with animations, gradients, and responsive layouts
 
 ### Modular Design
 The script is built with a modular architecture featuring:
@@ -171,7 +210,30 @@ The script is built with a modular architecture featuring:
 
 ## Troubleshooting
 
-### Common Issues
+### HTML Report Navigation Issues
+1. **Navigation Menu Not Responding**
+   - **Solution:** Ensure JavaScript is enabled in your browser
+   - **Alternative:** Use a modern browser (Chrome, Firefox, Edge)
+
+2. **Sections Not Expanding/Collapsing**
+   - **Cause:** JavaScript execution blocked or browser compatibility
+   - **Solution:** Check browser console for errors, use updated browser
+
+3. **Layout Corruption in Specific Sections**
+   - **Symptoms:** Content overlapping or misaligned
+   - **Solution:** Refresh the page, ensure browser zoom is at 100%
+
+4. **Print Layout Issues**
+   - **Cause:** Print-specific CSS not loading properly
+   - **Solution:** Use browser's print preview and adjust print settings
+
+### Performance Tips
+- Use specific assessment modes for faster execution
+- Ensure sufficient disk space in the output directory
+- Close unnecessary applications to free up system resources
+- Run during off-peak hours for comprehensive assessments
+
+### Common Script Issues
 
 1. **Permission Denied Errors**
    - **Solution:** Run PowerShell as Administrator
@@ -192,12 +254,6 @@ The script is built with a modular architecture featuring:
 5. **Long Execution Times**
    - **Expected Behavior:** Complete server assessments can take several minutes
    - **Optimization:** Use specific assessment modes (1-4) instead of "ALL SECTIONS" for faster execution
-
-### Performance Tips
-- Use specific assessment modes for faster execution
-- Ensure sufficient disk space in the output directory
-- Close unnecessary applications to free up system resources
-- Run during off-peak hours for comprehensive assessments
 
 ## Security Considerations
 

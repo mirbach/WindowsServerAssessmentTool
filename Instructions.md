@@ -7,9 +7,36 @@
 **Date**: June 16, 2025  
 **Purpose**: Generates comprehensive Windows Server assessment reports in both HTML and CSV formats using a modular, function-based architecture with menu-driven selective data collection.
 
-**Current Status**: This script includes modular functions for system information, network analysis, security assessments, and task/log collection. The tool provides five distinct assessment modes for targeted data collection based on user requirements.
+**Current Status**: This script features a modern, interactive HTML interface with collapsible navigation, professional styling, and comprehensive assessment capabilities. The tool provides five distinct assessment modes for targeted data collection based on user requirements, generating both interactive HTML reports and detailed CSV exports.
 
 ## Script Architecture
+
+### Modern HTML Interface
+The script generates professional HTML reports featuring:
+
+1. **Interactive Navigation System**
+   - Collapsible left-aligned navigation menu
+   - Icon-based section identification
+   - Smooth animations and transitions
+   - Section counters and progress indicators
+
+2. **Advanced CSS3 Styling**
+   - Gradient backgrounds and modern color schemes
+   - Responsive design for desktop and tablet viewing
+   - Hover effects and interactive elements
+   - Professional typography and spacing
+
+3. **JavaScript Functionality**
+   - Dynamic content switching between sections
+   - Navigation menu expand/collapse functionality
+   - Smooth scrolling and content transitions
+   - Browser compatibility optimization
+
+4. **Executive Summary Dashboard**
+   - Visual metrics overview with key statistics
+   - Color-coded assessment scope indicators
+   - Quick access to all report sections
+   - Professional header with system information
 
 ### Modular Design
 The script has been refactored with a modular approach using dedicated functions for each major assessment area:
@@ -126,18 +153,27 @@ The script uses built-in Windows PowerShell cmdlets and does not require additio
 
 ### Step 2: Navigate to Script Location
 ```powershell
-cd "c:\temp\Server Check"
+cd "d:\Scripts\WindowsServerAssessmentTool"
 ```
 
 ### Step 3: Run the Script
 ```powershell
-.\SystemHealthCheckforWindowsServer_V1.0.ps1
+.\WindowsServerAssessmentTool_V1.0.ps1
 ```
 
-### Step 4: Specify Output Directory
-- The script will prompt you to enter a directory path
-- Example: `C:\temp` or `C:\Reports`
-- The script will create the directory if it doesn't exist
+### Step 4: Select Assessment Mode
+- The script will display an interactive menu with 5 options:
+  1. **System Information Only** - Hardware, OS, services, programs
+  2. **Network Assessment Only** - Network interfaces, traffic, ports
+  3. **Security Assessment Only** - Security settings, policies, certificates
+  4. **Tasks & Logs Assessment Only** - Startup programs, tasks, event logs
+  5. **All Sections** - Complete comprehensive assessment
+
+### Step 5: Review Interactive HTML Report
+- Open the generated HTML file in a modern browser
+- Use the collapsible navigation menu to explore sections
+- Click on section headers to expand/collapse content
+- Utilize the executive summary dashboard for quick insights
 
 ## Quick Reference
 
@@ -150,27 +186,35 @@ Get-ExecutionPolicy
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # Navigate to script directory
-cd "c:\temp\Server Check"
+cd "d:\Scripts\WindowsServerAssessmentTool"
 
 # Run the script
-.\SystemHealthCheckforWindowsServer_V1.0.ps1
+.\WindowsServerAssessmentTool_V1.0.ps1
 
 # Check for script errors (run in PowerShell ISE or VS Code)
-powershell -File ".\SystemHealthCheckforWindowsServer_V1.0.ps1"
+powershell -File ".\WindowsServerAssessmentTool_V1.0.ps1"
 ```
 
 ### Expected Runtime Indicators
-- **Quick start**: Script initialization and directory creation (< 30 seconds)
-- **System Information**: OS, CPU, memory, disk collection (1-3 minutes)
-- **Security Analysis**: Antivirus, firewall, certificates, policies (2-5 minutes)
-- **Network Analysis**: Interfaces, traffic, ports (1-2 minutes)
-- **Tasks & Logs**: Startup programs, scheduled tasks, event logs (2-5 minutes)
-- **Report Generation**: HTML creation and ZIP archive (< 1 minute)
+- **Script Initialization**: Menu display and user selection (< 30 seconds)
+- **System Information Mode**: OS, CPU, memory, disk collection (2-5 minutes)
+- **Network Assessment Mode**: Interfaces, traffic, ports (1-3 minutes)
+- **Security Assessment Mode**: Antivirus, firewall, certificates, policies (3-7 minutes)
+- **Tasks & Logs Mode**: Startup programs, scheduled tasks, event logs (2-4 minutes)
+- **Complete Assessment (All Sections)**: Full system analysis (8-15 minutes)
+- **HTML Report Generation**: Interactive report creation with navigation (< 1 minute)
 
 ## Output Files Generated
 
-### HTML Report
+### Interactive HTML Report
 - **Filename**: `[ServerName]-SystemReport.html`
+- **Features**: 
+  - Modern collapsible navigation menu with icons
+  - Interactive section expansion/collapse
+  - Executive summary dashboard
+  - Professional styling with gradients and animations
+  - Responsive design for desktop and tablet viewing
+  - Print-optimized layout
 - **Description**: Comprehensive HTML report with all collected information
 - **Usage**: Open in web browser for easy viewing and printing
 
