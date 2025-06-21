@@ -5,10 +5,26 @@ The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShel
 
 ## Key Features
 - **Modern Interactive HTML Reports**: Collapsible left navigation menu with icons and smooth animations
-- **Menu-Driven Assessment Modes**: Five targeted assessment options for focused data collection
+- **Menu-Driven Assessment Modes**: Five targeted assessment options for focused data collection  
 - **Professional UI/UX**: Responsive design with color-coded sections and hover effects
+- **User-Friendly Data Presentation**: PSCustomObject implementation with descriptive column names
+- **Responsive Tables**: Auto-sizing tables with horizontal scrolling for wide data
+- **Dynamic Report Sections**: Report content dynamically reflects user's menu selection
 - **Comprehensive CSV Exports**: Detailed data files for external analysis and reporting
 - **Modular Architecture**: Efficient function-based design for optimal performance
+
+## Recent Improvements (Latest Version)
+### Enhanced User Experience
+- **User-Friendly Column Names**: All major sections now use PSCustomObject with descriptive column headers instead of technical property names
+- **Responsive Table Design**: Wide tables automatically scroll horizontally and resize appropriately
+- **Dynamic Report Content**: "Key Areas Assessed" and "Assessment Categories" sections now dynamically reflect the user's menu selection
+- **Improved Table Headers**: Header text uses proper capitalization (first letter of each word) instead of all uppercase
+- **Search Functionality Removed**: Removed search input from "Running Windows Services" section for cleaner interface
+
+### Technical Enhancements
+- **Enhanced Error Handling**: Improved error handling throughout all collection functions
+- **Optimized Data Processing**: Better memory management and performance optimization
+- **Consistent Output Format**: Standardized HTML table formatting across all sections
 
 ## Version Information
 - **File Name:** WindowsServerAssessmentTool_V1.0.ps1
@@ -37,34 +53,47 @@ The generated HTML reports include:
 3. **Interactive Content Organization**
    - Clickable navigation for instant section access
    - Subsection organization for detailed information
-   - Search-friendly content structure
+   - Responsive table containers for wide data sets
+   - Auto-sizing tables with horizontal scrolling capability
    - Print-optimized styling
+
+4. **Enhanced Data Presentation**
+   - User-friendly column names throughout all sections
+   - PSCustomObject implementation for better readability
+   - Proper table header capitalization
+   - Clean, professional table styling
+   - Dynamic report sections based on user selection
 
 ### Menu-Driven Selection
 The script offers five distinct assessment modes:
 
 1. **SYSTEM INFORMATION ONLY**
    - OS Details, CPU, Memory, Disk Information
-   - Windows Features, Services, Programs
+   - Windows Features, Services, Programs  
    - Updates and Processes
+   - **Generated Sections**: 13 comprehensive system assessment areas
 
 2. **NETWORK ASSESSMENT ONLY**
    - Network Interface Configuration
    - Traffic Statistics and Performance
    - Open Ports and Connections
+   - **Generated Sections**: 3 focused network assessment areas
 
 3. **SECURITY ASSESSMENT ONLY**
    - Antivirus and Firewall Settings
    - User Accounts and Password Policies
    - Security Configurations and Certificates
+   - **Generated Sections**: 17 comprehensive security assessment areas
 
 4. **SCHEDULED TASKS & STARTUP & LOGS ONLY**
    - Startup Programs and Services
    - Scheduled Tasks Configuration
    - System, Application & Security Event Logs
+   - **Generated Sections**: 3 focused task and log assessment areas
 
 5. **ALL SECTIONS (Complete Server Assessment)**
    - Comprehensive collection of all above sections
+   - **Generated Sections**: 36 total assessment areas covering all aspects
 
 ### Output Files Generated
 
@@ -155,7 +184,8 @@ The script generates targeted CSV files based on the selected assessment mode:
    - Choose from the 5 available options:
      - Enter `1` for System Information Assessment Only
      - Enter `2` for Network Assessment Only
-     - Enter `3` for Security Assessment Only     - Enter `4` for Tasks & Logs Assessment Only
+     - Enter `3` for Security Assessment Only 
+     - Enter `4` for Tasks & Logs Assessment Only
      - Enter `5` for Complete Server Assessment
 
 6. **Wait for Completion**
@@ -168,11 +198,18 @@ The script generates targeted CSV files based on the selected assessment mode:
 The HTML assessment report includes:
 - **Executive Summary Dashboard:** Key metrics overview with visual indicators
 - **Interactive Navigation Menu:** Collapsible left sidebar with icons and section counters
+- **Dynamic Content Sections:** Report content automatically reflects selected assessment mode
 - **Modern Styling:** Professional gradient backgrounds, hover effects, and responsive design
 - **Section-Based Organization:** Content organized by assessment areas with expandable subsections
-- **Comprehensive Data Presentation:** Detailed information in professionally styled tables
+- **Enhanced Data Tables:** User-friendly column names and responsive table design
 - **Header Information:** Server name, generation timestamp, logged user, assessment scope
 - **Print-Friendly Layout:** Optimized for both screen viewing and printing
+
+#### Improved Data Presentation
+- **User-Friendly Column Names:** All tables use descriptive headers instead of technical property names
+- **Responsive Tables:** Wide tables automatically include horizontal scrolling and proper sizing
+- **Dynamic Sections:** "Key Areas Assessed" and "Assessment Categories" reflect your menu selection
+- **Professional Formatting:** Proper capitalization and clean styling throughout
 
 #### CSV Files
 - Each CSV file contains raw data for specific system components
@@ -188,6 +225,9 @@ The script generates HTML reports with:
 - **Professional Styling:** Gradient backgrounds, icon integration, and responsive design
 - **JavaScript Functionality:** Dynamic content switching and navigation management
 - **CSS3 Features:** Modern styling with animations, gradients, and responsive layouts
+- **Enhanced Data Tables:** Responsive table containers with horizontal scrolling for wide data
+- **User-Friendly Headers:** Descriptive column names using PSCustomObject implementation
+- **Dynamic Content:** Report sections automatically adjust based on user's menu selection
 
 ### Modular Design
 The script is built with a modular architecture featuring:
@@ -201,6 +241,32 @@ The script is built with a modular architecture featuring:
 2. **Get-NetworkInformation:** Gathers network configuration and statistics
 3. **Get-SecurityInformation:** Retrieves security settings and configurations
 4. **Get-TasksStartupLogsInformation:** Collects startup programs, tasks, and logs
+
+### Data Presentation Enhancements
+The script now provides significantly improved data presentation:
+
+#### PSCustomObject Implementation
+All major sections now use PSCustomObject with user-friendly column names:
+- **Antivirus Settings**: "AV Enabled", "Real Time Protection", "Behavior Monitor" (instead of technical property names)
+- **SMB Shares**: "Share Name", "Share Path", "Share Type", "Folder Enumeration Mode"
+- **Updates Installed**: "Update Title", "Installation Date", "Update Size (MB)", "Description"
+- **DNS Client Settings**: "DNS Servers", "DNS Over HTTPS", "DNS Cache", "Secure Name Resolution"
+- **PowerShell Execution Policy**: "Scope", "Execution Policy", "Security Risk Assessment"
+- **Running Processes**: "Process Name", "Process ID", "Memory Usage (MB)", "CPU Time", "Window Title"
+- **Windows Features**: "Feature Name", "Display Name", "Current State", "Restart Required"
+- **TCP Ports Opened**: "Local Address", "Local Port", "Remote Address", "Remote Port", "Connection State", "Process Name"
+- **Event Viewer Logs**: "Log Name", "Maximum Log Size (KB)", "Overflow Action", "Minimum Retention (Days)"
+
+#### Responsive Table Design
+- **Wide Tables**: Automatically wrapped in responsive containers with horizontal scrolling
+- **Professional Styling**: Modern table headers with proper capitalization
+- **Auto-sizing**: Tables adjust to content width while maintaining readability
+- **Mobile-Friendly**: Responsive design works across different screen sizes
+
+#### Dynamic Report Content
+- **Assessment Categories**: Dynamically shows "System Information", "Network Configuration", "Security Assessment", etc. based on menu selection
+- **Key Areas Assessed**: Content automatically reflects the chosen assessment mode
+- **Section Counts**: Navigation menu shows accurate section counts for selected mode
 
 ### Performance Considerations
 - **Selective Assessment:** Only gathers data for selected sections
@@ -223,7 +289,17 @@ The script is built with a modular architecture featuring:
    - **Symptoms:** Content overlapping or misaligned
    - **Solution:** Refresh the page, ensure browser zoom is at 100%
 
-4. **Print Layout Issues**
+4. **Tables Not Displaying Properly**
+   - **Symptoms:** Wide tables overflowing or headers misaligned
+   - **Solution:** Ensure browser supports CSS flexbox and CSS3 features
+   - **Alternative:** Use horizontal scroll within table containers
+
+5. **Dynamic Content Not Updating**
+   - **Cause:** Report sections not reflecting selected assessment mode
+   - **Solution:** Re-run the script if content doesn't match your selection
+   - **Check:** Verify the correct menu option was selected during execution
+
+6. **Print Layout Issues**
    - **Cause:** Print-specific CSS not loading properly
    - **Solution:** Use browser's print preview and adjust print settings
 
@@ -298,7 +374,15 @@ To customize what information is assessed:
 - **Annual Overhaul:** Consider adding new sections based on evolving security requirements
 
 ### Version History
-- **V1.0 (June 2025):** Initial release with menu-driven selective assessment
+- **V1.0 (June 2025):** Initial release with menu-driven selective assessment, enhanced user interface, and improved data presentation
+
+### Recent Updates (Current Version)
+- **Enhanced Data Presentation:** Implemented PSCustomObject throughout all major sections for user-friendly column names
+- **Responsive Table Design:** Added table containers with horizontal scrolling for wide data sets
+- **Dynamic Report Content:** Assessment Categories and Key Areas Assessed sections now reflect user's menu selection
+- **Improved Table Formatting:** Headers use proper capitalization instead of all uppercase
+- **UI/UX Improvements:** Removed search functionality from Windows Services section for cleaner interface
+- **Better Error Handling:** Enhanced error handling and performance optimization throughout
 
 ### Future Enhancements
 Potential improvements for future versions:
@@ -307,6 +391,9 @@ Potential improvements for future versions:
 - **Email Reports:** Automatic email delivery of assessment reports
 - **Comparative Analysis:** Historical trending and comparison features
 - **Custom Thresholds:** Configurable alert thresholds for various metrics
+- **Export Options:** Additional export formats (JSON, XML)
+- **Custom Branding:** Configurable report headers and styling
+- **Advanced Filtering:** Interactive filtering options within HTML reports
 
 ## Support and Contact
 

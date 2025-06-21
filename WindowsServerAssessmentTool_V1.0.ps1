@@ -95,7 +95,7 @@ Write-Host "5. ALL SECTIONS (Complete Health Check)" -ForegroundColor Green
 Write-Host "   - System Information" -ForegroundColor Gray
 Write-Host "   - Network Information" -ForegroundColor Gray
 Write-Host "   - Security Information" -ForegroundColor Gray
-Write-Host "   - Tasks, Startup & Logs Information" -ForegroundColor Gray
+Write-Host "   - Scheduled Tasks, Startup Programs, and Logs Information" -ForegroundColor Gray
 Write-Host ""
 
 do {
@@ -242,13 +242,51 @@ function Get-SystemInformation {
         "RunningProcesses" = ""
         "InstalledUpdates" = ""
         "MissingUpdates" = ""
-    }
-    
-    # === OS Details ===
+    }      # === OS Details ===
     Write-Host "Collecting OS Details..." -ForegroundColor Yellow
     try {
-        $osInfo = Get-ComputerInfo | Select-Object OsName, OsArchitecture, CsName, OsVersion, OsBuildNumber, WindowsInstallationType
+        $osInfoRaw = Get-ComputerInfo | Select-Object OsName, OsArchitecture, CsName, OsVersion, OsBuildNumber, WindowsInstallationType, WindowsInstallDateFromRegistry
         $osInfoAll = Get-ComputerInfo | Select-Object *
+        
+        # Format OS installation date
+        $formattedInstallDate = "N/A"
+        if ($osInfoRaw.WindowsInstallDateFromRegistry) {
+            try {
+                $formattedInstallDate = $osInfoRaw.WindowsInstallDateFromRegistry.ToString("dd MMMM yyyy h:mm:ss tt")
+            } catch {
+                # If formatting fails, try alternative method using Win32_OperatingSystem
+                try {
+                    $osInstallDate = (Get-CimInstance Win32_OperatingSystem).InstallDate
+                    if ($osInstallDate) {
+                        $formattedInstallDate = $osInstallDate.ToString("dd MMMM yyyy h:mm:ss tt")
+                    }
+                } catch {
+                    $formattedInstallDate = if ($osInfoRaw.WindowsInstallDateFromRegistry) { $osInfoRaw.WindowsInstallDateFromRegistry.ToString() } else { "N/A" }
+                }
+            }
+        } else {
+            # Try alternative method using Win32_OperatingSystem if WindowsInstallDateFromRegistry is not available
+            try {
+                $osInstallDate = (Get-CimInstance Win32_OperatingSystem).InstallDate
+                if ($osInstallDate) {
+                    $formattedInstallDate = $osInstallDate.ToString("dd MMMM yyyy h:mm:ss tt")
+                }
+            } catch {
+                $formattedInstallDate = "N/A"
+            }
+        }
+        
+        # Create custom object with renamed columns for HTML display
+        $osInfo = [PSCustomObject]@{
+            "Operating System" = $osInfoRaw.OsName
+            "OS Architecture" = $osInfoRaw.OsArchitecture
+            "Computer Name" = $osInfoRaw.CsName
+            "OS Version" = $osInfoRaw.OsVersion
+            "OS Build Number" = $osInfoRaw.OsBuildNumber
+            "Server/Client" = $osInfoRaw.WindowsInstallationType
+            "OS Installation Date" = $formattedInstallDate
+        }
+        
         $csvosinfo = Join-Path -Path $Path -ChildPath "$ServerName-OSInfo.csv"
         $osInfoAll | Export-Csv -Path $csvosinfo -NoTypeInformation
         $htmlSections['OSInfo'] = $osInfo | ConvertTo-Html -Fragment -PreContent "<h2>OS Details</h2>"
@@ -261,7 +299,7 @@ function Get-SystemInformation {
     # === OS Uptime Info ===
     Write-Host "Collecting System Uptime..." -ForegroundColor Yellow
     try {
-        $uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime | Select-Object Days, Hours, Minutes, TotalDays, TotalHours, TotalMinutes
+        $uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime | Select-Object Days, Hours, Minutes
         $uptimeAll = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime | Select-Object *
         $csvuptimeinfo = Join-Path -Path $Path -ChildPath "$ServerName-UpTime.csv"
         $uptimeAll | Export-Csv -Path $csvuptimeinfo -NoTypeInformation
@@ -279,20 +317,29 @@ function Get-SystemInformation {
         $cpuusage = Get-Counter '\Processor(*)\% Processor Time' | Select-Object -ExpandProperty CounterSamples | 
             Where-Object {$_.InstanceName -ne '_Total'} | ForEach-Object {
             [PSCustomObject]@{
-                "InstanceName" = $_.InstanceName
-                "InstanceUsage(%)" = [math]::Round($_.CookedValue,2)
+                "Logical Core" = $_.InstanceName
+                "Logical Core Utilization Percentage(%)" = [math]::Round($_.CookedValue,2)
              }
         }
         $csvcpuusageinfo = Join-Path -Path $Path -ChildPath "$ServerName-CPUUsage.csv"
         $cpuusage | Export-Csv -Path $csvcpuusageinfo -NoTypeInformation
-        $htmlSections['CPUUsage'] = $cpuusage | ConvertTo-Html -Fragment -PreContent "<h2>CPU Usage</h2>"
-
-        # CPU Details
-        $cpuinfo = Get-CimInstance Win32_Processor | Select-Object Name, Caption, Manufacturer, NumberOfCores, NumberOfLogicalProcessors, LoadPercentage
+        $htmlSections['CPUUsage'] = $cpuusage | ConvertTo-Html -Fragment -PreContent "<h2>CPU Usage</h2>"        # CPU Information
+        $cpuinfo = Get-CimInstance Win32_Processor | Select-Object Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors, LoadPercentage
         $cpuinfoAll = Get-CimInstance Win32_Processor | Select-Object *
         $csvcpuinfo = Join-Path -Path $Path -ChildPath "$ServerName-CPUInfo.csv"
         $cpuinfoAll | Export-Csv -Path $csvcpuinfo -NoTypeInformation
-        $htmlSections['CPUInfo'] = $cpuinfo | ConvertTo-Html -Fragment -PreContent "<h2>CPU Details</h2>"
+        
+        # Create custom display object for HTML with renamed columns
+        $cpuinfoDisplay = $cpuinfo | ForEach-Object {
+            [PSCustomObject]@{
+                "CPU Name" = $_.Name
+                "Manufacturer" = $_.Manufacturer
+                "Physical Cores" = $_.NumberOfCores
+                "Logical Cores" = $_.NumberOfLogicalProcessors
+                "Utilization Percentage" = $_.LoadPercentage
+            }
+        }
+        $htmlSections['CPUInfo'] = $cpuinfoDisplay | ConvertTo-Html -Fragment -PreContent "<h2>CPU Details</h2>"
         Write-Host "CPU Information - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect CPU Information: $($_.Exception.Message)"
@@ -315,7 +362,7 @@ function Get-SystemInformation {
 
             [PSCustomObject]@{
                 "Partition"        = $_.DeviceID
-                "DriveType"        = switch ($_.DriveType) {
+                "Drive Type"        = switch ($_.DriveType) {
                                         0 { "Unknown" }
                                         1 { "No Root Directory" }
                                         2 { "Removable Disk" }
@@ -324,11 +371,11 @@ function Get-SystemInformation {
                                         5 { "CD-ROM" }
                                         6 { "RAM Disk" }
                                     }
-                "FileSystem"       = $_.FileSystem
-                "TotalSize(GB)"    = [math]::Round($_.Size / 1GB, 2)
-                "UsedSpace(GB)"    = [math]::Round($usedSpace / 1GB, 2)
-                "FreeSpace(GB)"    = [math]::Round($_.FreeSpace / 1GB, 2)
-                "FreePercent(%)"   = [math]::Round($freePercent, 2)
+                "File System"       = $_.FileSystem
+                "Total Size(GB)"    = [math]::Round($_.Size / 1GB, 2)
+                "Used Space(GB)"    = [math]::Round($usedSpace / 1GB, 2)
+                "Free Space(GB)"    = [math]::Round($_.FreeSpace / 1GB, 2)
+                "Free Percentage(%)"   = [math]::Round($freePercent, 2)
                 "VolumeName"       = $_.VolumeName
                 "Description"      = $_.Description
             }
@@ -353,11 +400,11 @@ function Get-SystemInformation {
         $freePercent = [math]::Round(($freeRAM / $totalRAM) * 100, 2)
 
         $RAMreport = [PSCustomObject]@{
-            "TotalRAM(GB)" = [math]::Round($totalRAM, 2)
-            "UsedRAM(GB)" = [math]::Round($usedRAM, 2)
-            "UsedRAMPercent(%)" = $usagePercent
-            "FreeRAM(GB)" = [math]::Round($freeRAM, 2)
-            "FreeRAMPercent(%)" = $freePercent
+            "Total RAM(GB)" = [math]::Round($totalRAM, 2)
+            "Used RAM(GB)" = [math]::Round($usedRAM, 2)
+            "RAM Utilization Percentage(%)" = $usagePercent
+            "Free RAM(GB)" = [math]::Round($freeRAM, 2)
+            "Free RAM Percentage(%)" = $freePercent
         }
         $csvraminfo = Join-Path -Path $Path -ChildPath "$ServerName-RAMInfo.csv"
         $RAMreport | Export-Csv -Path $csvraminfo -NoTypeInformation
@@ -366,16 +413,26 @@ function Get-SystemInformation {
     } catch {
         Write-Warning "Failed to collect Memory Information: $($_.Exception.Message)"
         $htmlSections['RAMInfo'] = "<h2>RAM Details</h2><p>Error collecting memory information</p>"
-    }
-
-    # === Windows Features ===
+    }    # === Windows Features ===
     Write-Host "Collecting Windows Features..." -ForegroundColor Yellow
     try {
-        $Features = Get-WindowsFeature | Where-Object {$_.Installed -eq $True} | Select-Object Name, DisplayName, Path, InstallState, FeatureType
+        $featuresRaw = Get-WindowsFeature | Where-Object {$_.Installed -eq $True} | Select-Object Name, DisplayName, Path, InstallState, FeatureType
         $FeaturesAll = Get-WindowsFeature | Where-Object {$_.Installed -eq $True} | Select-Object * -ExcludeProperty DependsOn
+        
+        # Create PSCustomObject array with user-friendly column names
+        $Features = $featuresRaw | ForEach-Object {
+            [PSCustomObject]@{
+                'Name' = $_.Name
+                'Feature Display Name' = $_.DisplayName
+                'Feature Path' = if ($_.Path) { $_.Path } else { "N/A" }
+                'Installation State' = $_.InstallState
+                'Feature Type' = $_.FeatureType
+            }
+        }
+        
         $csvWinFeatures = Join-Path -Path $Path -ChildPath "$ServerName-WinFeatures.csv"
         $FeaturesAll | Export-Csv -Path $csvWinFeatures -NoTypeInformation
-        $htmlSections['WindowsFeatures'] = $Features | ConvertTo-Html -Fragment -PreContent "<h2>Windows Features Installed</h2>"
+        $htmlSections['WindowsFeatures'] = "<div class='table-container'>" + ($Features | ConvertTo-Html -Fragment -PreContent "<h2>Windows Features Installed</h2>") + "</div>"
         Write-Host "Windows Features - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect Windows Features: $($_.Exception.Message)"
@@ -385,8 +442,8 @@ function Get-SystemInformation {
     # === Windows Services ===
     Write-Host "Collecting Windows Services..." -ForegroundColor Yellow
     try {
-        $runningServicesData = Get-Service | Where-Object { $_.Status -eq 'Running' } | Select-Object Name, DisplayName, Status
-        $stoppedServicesData = Get-Service | Where-Object { $_.Status -eq 'Stopped' } | Select-Object Name, DisplayName, Status
+        $runningServicesData = Get-Service | Where-Object { $_.Status -eq 'Running' } | Select-Object DisplayName, Status, ServiceType
+        $stoppedServicesData = Get-Service | Where-Object { $_.Status -eq 'Stopped' } | Select-Object DisplayName, Status, ServiceType
 
         $runningServicesDataAll = Get-Service | Where-Object { $_.Status -eq 'Running' } | Select-Object * 
         $stoppedServicesDataAll = Get-Service | Where-Object { $_.Status -eq 'Stopped' } | Select-Object * 
@@ -394,9 +451,9 @@ function Get-SystemInformation {
         $csvRunning = Join-Path -Path $Path -ChildPath "$ServerName-RunningServices.csv"
         $csvStopped = Join-Path -Path $Path -ChildPath "$ServerName-StoppedServices.csv"
         $runningServicesDataAll | Export-Csv -Path $csvRunning -NoTypeInformation
-        $stoppedServicesDataAll | Export-Csv -Path $csvStopped -NoTypeInformation
-
-        $htmlSections['RunningServices'] = $runningServicesData | ConvertTo-Html -Fragment -PreContent "<h2>Running Windows Services</h2>"
+        $stoppedServicesDataAll | Export-Csv -Path $csvStopped -NoTypeInformation        # Create Running Services HTML without search functionality
+        $runningServicesHtml = $runningServicesData | ConvertTo-Html -Fragment -PreContent "<h2>Running Windows Services</h2>"
+        $htmlSections['RunningServices'] = $runningServicesHtml
         $htmlSections['StoppedServices'] = $stoppedServicesData | ConvertTo-Html -Fragment -PreContent "<h2>Stopped Windows Services</h2>"
         Write-Host "Windows Services - Completed" -ForegroundColor Green
     } catch {
@@ -406,44 +463,97 @@ function Get-SystemInformation {
     }    # === Installed Programs ===
     Write-Host "Collecting Installed Programs..." -ForegroundColor Yellow
     try {
-        # Get installed programs from both 32-bit and 64-bit registry locations
+        # Get installed programs from 32-bit, 64-bit, and user-specific registry locations
         $installedprogs32 = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
         $installedprogs64 = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
+        $installedprogsUser = Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
         
-        # Combine both lists and remove duplicates based on DisplayName
-        $installedprogsAll = @($installedprogs32) + @($installedprogs64) | Sort-Object DisplayName -Unique
-        
-        # Select only relevant fields and filter out empty entries
-        $installedprogs = $installedprogsAll | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
+        # Combine all lists and remove duplicates based on DisplayName
+        $installedprogsAll = @($installedprogs32) + @($installedprogs64) + @($installedprogsUser) | Sort-Object DisplayName -Unique
+          # Select only relevant fields and filter out empty entries
+        $installedprogs = $installedprogsAll | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, EstimatedSize | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
         
         $csvinstalledprogsinfo = Join-Path -Path $Path -ChildPath "$ServerName-InstalledProgs.csv"
         $installedprogs | Export-Csv -Path $csvinstalledprogsinfo -NoTypeInformation
-        $htmlSections['InstalledPrograms'] = $installedprogs | ConvertTo-Html -Fragment -PreContent "<h2>Programs Installed</h2>"
+          # Create custom display object for HTML with renamed columns
+        $installedprogsDisplay = $installedprogs | ForEach-Object {
+            # Format InstallDate to proper DateTime format
+            $formattedDate = "N/A"
+            if ($_.InstallDate -and $_.InstallDate.ToString().Trim() -ne "") {
+                try {
+                    # InstallDate is typically in YYYYMMDD format from registry
+                    $dateString = $_.InstallDate.ToString()
+                    if ($dateString.Length -eq 8 -and $dateString -match '^\d{8}$') {
+                        # Parse YYYYMMDD format
+                        $year = $dateString.Substring(0, 4)
+                        $month = $dateString.Substring(4, 2)
+                        $day = $dateString.Substring(6, 2)
+                        $dateTime = [DateTime]::ParseExact("$year-$month-$day", "yyyy-MM-dd", $null)
+                        $formattedDate = $dateTime.ToString("dd MMMM yyyy h:mm:ss tt")
+                    } else {
+                        # Try to parse as regular DateTime if not in YYYYMMDD format
+                        $dateTime = [DateTime]::Parse($dateString)
+                        $formattedDate = $dateTime.ToString("dd MMMM yyyy h:mm:ss tt")
+                    }
+                } catch {
+                    # If parsing fails, keep original value or set to N/A
+                    $formattedDate = if ($_.InstallDate) { $_.InstallDate.ToString() } else { "N/A" }
+                }
+            }
+            
+            [PSCustomObject]@{
+                "Program Name" = $_.DisplayName
+                "Program Version" = $_.DisplayVersion
+                "Publisher" = $_.Publisher
+                "Size (MB)" = $_.EstimatedSize
+                "Installed Date" = $formattedDate
+            }
+        }
+        $htmlSections['InstalledPrograms'] = $installedprogsDisplay | ConvertTo-Html -Fragment -PreContent "<h2>Installed Programs</h2>"
         Write-Host "Installed Programs - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect Installed Programs: $($_.Exception.Message)"
-        $htmlSections['InstalledPrograms'] = "<h2>Programs Installed</h2><p>Error collecting installed programs</p>"
-    }
-
-    # === Running Processes ===
+        $htmlSections['InstalledPrograms'] = "<h2>Installed Programs</h2><p>Error collecting installed programs</p>"
+    }    # === Running Processes ===
     Write-Host "Collecting Current Running Processes..." -ForegroundColor Yellow
     try {
-        $CurrentProcesses = Get-Process -IncludeUserName | Select-Object Id, SessionId, ProcessName, StartTime, UserProcessorTime, TotalProcessorTime, CPU, Description, UserName, Path
+        $processesRaw = Get-Process -IncludeUserName | Select-Object Id, SessionId, ProcessName, StartTime, UserProcessorTime, TotalProcessorTime, CPU, Description, UserName, Path
         $allProcesses = Get-Process -IncludeUserName 
+
+        # Create PSCustomObject array with user-friendly column names
+        $CurrentProcesses = $processesRaw | ForEach-Object {
+            [PSCustomObject]@{
+                'Process ID' = $_.Id
+                'Session ID' = $_.SessionId
+                'Process Name' = $_.ProcessName
+                'Start Time' = if ($_.StartTime) { $_.StartTime.ToString("yyyy-MM-dd HH:mm:ss") } else { "N/A" }
+                'User CPU Time' = if ($_.UserProcessorTime) { $_.UserProcessorTime.ToString("hh\:mm\:ss") } else { "N/A" }
+                'Total CPU Time' = if ($_.TotalProcessorTime) { $_.TotalProcessorTime.ToString("hh\:mm\:ss") } else { "N/A" }
+                'CPU %' = if ($_.CPU) { [math]::Round($_.CPU, 2) } else { "N/A" }
+                'Description' = if ($_.Description) { $_.Description } else { "N/A" }
+                'User Name' = if ($_.UserName) { $_.UserName } else { "N/A" }
+                'Executable Path' = if ($_.Path) { $_.Path } else { "N/A" }
+            }
+        }
 
         $csvallProcesses = Join-Path -Path $Path -ChildPath "$ServerName-allProcesses.csv"
         $allProcesses | Export-Csv -Path $csvallProcesses -NoTypeInformation
-        $htmlSections['RunningProcesses'] = $CurrentProcesses | ConvertTo-Html -Fragment -PreContent "<h2>Current Running Processes</h2>"
+        $htmlSections['RunningProcesses'] = "<div class='table-container'>" + ($CurrentProcesses | ConvertTo-Html -Fragment -PreContent "<h2>Current Running Processes</h2>") + "</div>"
         Write-Host "Current Running Processes - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect Running Processes: $($_.Exception.Message)"
         $htmlSections['RunningProcesses'] = "<h2>Current Running Processes</h2><p>Error collecting running processes</p>"
-    }
-
-    # === Updates Installed ===
+    }# === Updates Installed ===
     Write-Host "Collecting Windows Updates..." -ForegroundColor Yellow
     try {
-        $updates = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object HotFixID, Description, InstalledOn, InstalledBy
+        $updatesRaw = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object HotFixID, InstalledOn, InstalledBy
+        $updates = $updatesRaw | ForEach-Object {
+            [PSCustomObject]@{
+                "Hot Fix ID" = $_.HotFixID
+                "Installed On" = $_.InstalledOn
+                "Installed By" = $_.InstalledBy
+            }
+        }
         $updatesAll = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object *
         $csvupdatesinstalledinfo = Join-Path -Path $Path -ChildPath "$ServerName-UpdatesInstalledInfo.csv"
         $updatesAll | Export-Csv -Path $csvupdatesinstalledinfo -NoTypeInformation
@@ -462,9 +572,9 @@ function Get-SystemInformation {
         $missingupdatesResult = $updateSearcher.Search("IsInstalled=0")
         $missingupdates = $missingupdatesResult.Updates | ForEach-Object {
                     [PSCustomObject]@{
-                        Title = $_.Title
-                        KB = ($_.KBArticleIDs -join ", ")
-                        SizeMB = [math]::Round($_.MaxDownloadSize / 1MB, 2)
+                        "Missing Windows Update" = $_.Title
+                        "KB" = ($_.KBArticleIDs -join ", ")
+                        "Size (MB)" = [math]::Round($_.MaxDownloadSize / 1MB, 2)
                     }
                 } 
         $csvmissingupdatesinfo = Join-Path -Path $Path -ChildPath "$ServerName-MissingUpdates.csv"
@@ -556,15 +666,15 @@ function Get-NetworkInformation {
     Write-Host "Collecting NIC Details..." -ForegroundColor Yellow
     $nicInfo = Get-NetIPConfiguration | ForEach-Object {
         [PSCustomObject]@{
-            "InterfaceAlias" = $_.InterfaceAlias
-            "InterfaceDescription" = $_.InterfaceDescription
-            "NetProfile" = $_.NetProfile.Name
+            "Interface Name" = $_.InterfaceAlias
+            "Description" = $_.InterfaceDescription
+            "Network Profile" = $_.NetProfile.Name
             "Status" = $_.NetAdapter.Status
             "IPv4Address" = ($_.IPv4Address.IPAddress -join ', ')
             "IPv6Address" = ($_.IPv6Address.IPAddress -join ', ')
-            "DNSServer" = ($_.DNSServer.ServerAddresses -join ', ')
-            "NetIPv6Interface" = $_.NetIPv6Interface.DHCP
-            "NetIPv4Interface" = $_.NetIPv4Interface.DHCP
+            "DNS Server" = ($_.DNSServer.ServerAddresses -join ', ')
+            "IPv6 Interface" = $_.NetIPv6Interface.DHCP
+            "IPv4 Interface" = $_.NetIPv4Interface.DHCP
             "MAC" = $_.NetAdapter.MacAddress
             "Speed" = $_.NetAdapter.LinkSpeed
         }
@@ -586,14 +696,25 @@ function Get-NetworkInformation {
      }
 
     $trafficInfo | Export-Csv -Path $CsvTrafficInfo -NoTypeInformation
-    $trafficInfoHtml = $trafficInfo | ConvertTo-Html -Fragment -PreContent "<h2>Current Traffic Details</h2>"
-
-    # === TCP Ports Opened ===
+    $trafficInfoHtml = $trafficInfo | ConvertTo-Html -Fragment -PreContent "<h2>Current Traffic Details</h2>"    # === TCP Ports Opened ===
     Write-Host "Collecting Open TCP Ports..." -ForegroundColor Yellow
-    $openports = Get-NetTCPConnection | Select-Object Localaddress, Localport, Remoteaddress, Remoteport, State, OwningProcess
+    $openportsRaw = Get-NetTCPConnection | Select-Object Localaddress, Localport, Remoteaddress, Remoteport, State, OwningProcess
     $openportsAll = Get-NetTCPConnection | Select-Object *
+    
+    # Create PSCustomObject array with user-friendly column names
+    $openports = $openportsRaw | ForEach-Object {
+        [PSCustomObject]@{
+            'Source IP Address' = $_.Localaddress
+            'Source Port' = $_.Localport
+            'Destination IP Address' = if ($_.Remoteaddress) { $_.Remoteaddress } else { "N/A" }
+            'Destination Port' = if ($_.Remoteport) { $_.Remoteport } else { "N/A" }
+            'Connection State' = $_.State
+            'Owning Process ID' = $_.OwningProcess
+        }
+    }
+    
     $openportsAll | Export-Csv -Path $CsvOpenPortsInfo -NoTypeInformation
-    $openportsHtml = $openports | ConvertTo-Html -Fragment -PreContent "<h2>TCP Ports Opened</h2>"
+    $openportsHtml = "<div class='table-container'>" + ($openports | ConvertTo-Html -Fragment -PreContent "<h2>TCP Ports Opened</h2>") + "</div>"
 
     Write-Host "Network Information Collection Complete" -ForegroundColor Green
     
@@ -649,11 +770,22 @@ function Get-SecurityInformation {
         [string]$CsvDefenderASR,
         [string]$CsvDefenderExploit
     )
-      Write-Host "=== COLLECTING SECURITY INFORMATION ===" -ForegroundColor Cyan
-
-    # === Antivirus ===
+      Write-Host "=== COLLECTING SECURITY INFORMATION ===" -ForegroundColor Cyan    # === Antivirus ===
     Write-Host "Collecting Antivirus Settings..." -ForegroundColor Yellow
-    $AVsettings = Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, AntispywareEnabled,  IoavProtectionEnabled, AntivirusSignatureLastUpdated, AntispywareSignatureLastUpdated, FullScanStartTime, FullScanEndTime, QuickScanStartTime, QuickScanEndTime
+    $AVsettingsRaw = Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, AntispywareEnabled,  IoavProtectionEnabled, AntivirusSignatureLastUpdated, AntispywareSignatureLastUpdated, FullScanStartTime, FullScanEndTime, QuickScanStartTime, QuickScanEndTime
+    $AVsettings = [PSCustomObject]@{
+        "AV Enabled" = $AVsettingsRaw.AntivirusEnabled
+        "Real Time Protection" = $AVsettingsRaw.RealTimeProtectionEnabled
+        "Behavior Monitor" = $AVsettingsRaw.BehaviorMonitorEnabled
+        "Anti Spyware Enabled" = $AVsettingsRaw.AntispywareEnabled
+        "Ioav Protection Enabled" = $AVsettingsRaw.IoavProtectionEnabled
+        "AV Signature Last Updates" = $AVsettingsRaw.AntivirusSignatureLastUpdated
+        "Anti Spyware Signature Last Updates" = $AVsettingsRaw.AntispywareSignatureLastUpdated
+        "Full Scan Start Time" = $AVsettingsRaw.FullScanStartTime
+        "Full Scan End Time" = $AVsettingsRaw.FullScanEndTime
+        "Quick Scan Start Time" = $AVsettingsRaw.QuickScanStartTime
+        "Quick Scan End Time" = $AVsettingsRaw.QuickScanEndTime
+    }
     $AVsettingsAll = Get-MpComputerStatus | Select-Object *
     $AVsettingsAll | Export-Csv -Path $CsvAVSettings -NoTypeInformation
     $AVsettingsHtml = $AVsettings | ConvertTo-Html -Fragment -PreContent "<h2>Anti-Virus Settings</h2>"
@@ -667,7 +799,7 @@ function Get-SecurityInformation {
 
     # === All firewall rules (filtered example) ===
     Write-Host "Collecting Firewall Rules..." -ForegroundColor Yellow
-    $FWSettings = Get-NetFirewallRule | Where-Object { $_.Enabled -eq "True" } | Select-Object DisplayName, Direction, Action, Profile
+    $FWSettings = Get-NetFirewallRule | Where-Object { $_.Enabled -eq "True" } | Select-Object DisplayName, Description, Direction, Action, Profile
     $FWSettingsAll = Get-NetFirewallRule | Where-Object { $_.Enabled -eq "True" } | Select-Object *
     $FWSettingsAll | Export-Csv -Path $CsvFWSettingsInfo -NoTypeInformation
     $FWSettingsHtml = $FWSettings | ConvertTo-Html -Fragment -PreContent "<h2>Firewall Settings</h2>"
@@ -679,16 +811,16 @@ function Get-SecurityInformation {
     $SMBv1All | Export-Csv -Path $CsvSMBv1 -NoTypeInformation
     $SMBv1Html = $SMBv1 | ConvertTo-Html -Fragment -PreContent "<h2>SMB V1 Status</h2>"
      
-    # === Inactive Accounts (no login in last 90 days) ===
+    # === Inactive Accounts (no login in last 365 days) ===
     Write-Host "Collecting Inactive Accounts..." -ForegroundColor Yellow
-    $inactiveAccounts = Get-LocalUser | Where-Object { $_.LastLogon -lt (Get-Date).AddDays(-90) } | Select-Object Name, Enabled, LastLogon
-    $inactiveAccountsAll = Get-LocalUser | Where-Object { $_.LastLogon -lt (Get-Date).AddDays(-90) } | Select-Object *
+    $inactiveAccounts = Get-LocalUser | Where-Object { $_.LastLogon -lt (Get-Date).AddDays(-365) } | Select-Object Name, Enabled, LastLogon
+    $inactiveAccountsAll = Get-LocalUser | Where-Object { $_.LastLogon -lt (Get-Date).AddDays(-365) } | Select-Object *
     $inactiveAccountsAll | Export-Csv -Path $CsvInactiveAccountsInfo -NoTypeInformation
-    $inactiveAccountsHtml = $inactiveAccounts | ConvertTo-Html -Fragment -PreContent "<h2>Inactive Accounts (no login in last 90 days)</h2>"
+    $inactiveAccountsHtml = $inactiveAccounts | ConvertTo-Html -Fragment -PreContent "<h2>Inactive Accounts (no login in last 365 days)</h2>"
 
     # === Local Admin Accounts ===
     Write-Host "Collecting Local Admin Accounts..." -ForegroundColor Yellow
-    $localAdmins = Get-LocalGroupMember -Group "Administrators"
+    $localAdmins = Get-LocalGroupMember -Group "Administrators" | Select-Object Name, SID
     $localAdmins | Export-Csv -Path $CsvLocalAdmins -NoTypeInformation
     $localAdminsHtml = $localAdmins | ConvertTo-Html -Fragment -PreContent "<h2>Local Admin Accounts</h2>"
 
@@ -704,22 +836,31 @@ function Get-SecurityInformation {
     $Lockoutduration = (net accounts | Select-String "Lockout duration").ToString().Split(':')[1].Trim()
     $Lockoutobservationwindow = (net accounts | Select-String "Lockout observation window").ToString().Split(':')[1].Trim()
     $passwordPolicy = [PSCustomObject]@{
-        MinimumPasswordAge = $minAge
-        MaximumPasswordAge = $maxAge
-        Minimumpasswordlength = $Minimumpasswordlength
-        Lengthofpasswordhistory = $Lengthofpasswordhistory
-        Lockoutthreshold = $Lockoutthreshold
-        Lockoutduration = $Lockoutduration
-        Lockoutobservationwindow = $Lockoutobservationwindow
-        forcelogoff = $forcelogoff
+        "Minimum Password Age" = $minAge
+        "Maximum Password Age" = $maxAge
+        "Password Length" = $Minimumpasswordlength
+        "Password History" = $Lengthofpasswordhistory
+        "Lockout Threshold" = $Lockoutthreshold
+        "Lockout Duration" = $Lockoutduration
+        "Lockout Observation Window" = $Lockoutobservationwindow
+        "Force Logoff" = $forcelogoff
     }
 
     $passwordPolicy | Export-Csv -Path $CsvPasswordPolicyInfo -NoTypeInformation
-    $passwordPolicyHtml = $passwordPolicy | ConvertTo-Html -Fragment -PreContent "<h2>Password Policy Details</h2>"
-
-    # === SMB Shares ===
+    $passwordPolicyHtml = $passwordPolicy | ConvertTo-Html -Fragment -PreContent "<h2>Password Policy Details</h2>"    # === SMB Shares ===
     Write-Host "Collecting SMB Shares..." -ForegroundColor Yellow
-    $shares = Get-SmbShare | Select-Object ShareType, FolderEnumerationMode, Description, Name, Path, ShadowCopy, Volume
+    $sharesRaw = Get-SmbShare | Select-Object ShareType, FolderEnumerationMode, Description, Name, Path, ShadowCopy, Volume
+    $shares = $sharesRaw | ForEach-Object {
+        [PSCustomObject]@{
+            "Share Type" = $_.ShareType
+            "Folder Enumeration Mode" = $_.FolderEnumerationMode
+            "Description" = $_.Description
+            "Share Folder Name" = $_.Name
+            "Share Folder Path" = $_.Path
+            "Is Shadow Copy" = $_.ShadowCopy
+            "Volume" = $_.Volume
+        }
+    }
     $sharesAll = Get-SmbShare | Select-Object *
     $sharesAll | Export-Csv -Path $CsvShares -NoTypeInformation
     $sharesHtml = $shares | ConvertTo-Html -Fragment -PreContent "<h2>SMB Shares</h2>"
@@ -751,7 +892,6 @@ function Get-SecurityInformation {
                 $results += [PSCustomObject]@{
                     Category = $category
                     Setting = $setting
-                    Computer = $env:COMPUTERNAME
                     Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
                 }
             }
@@ -845,8 +985,8 @@ function Get-SecurityInformation {
         $uacSettings = Get-ItemProperty -Path $uacRegPath -ErrorAction SilentlyContinue
         
         $uacInfo = [PSCustomObject]@{
-            "EnableLUA" = if($uacSettings.EnableLUA -eq 1) {"Enabled"} elseif($uacSettings.EnableLUA -eq 0) {"Disabled"} else {"Not Configured"}
-            "ConsentPromptBehaviorAdmin" = switch ($uacSettings.ConsentPromptBehaviorAdmin) {
+            "Enable LUA" = if($uacSettings.EnableLUA -eq 1) {"Enabled"} elseif($uacSettings.EnableLUA -eq 0) {"Disabled"} else {"Not Configured"}
+            "Consent Prompt Behavior Admin" = switch ($uacSettings.ConsentPromptBehaviorAdmin) {
                 0 {"Elevate without prompting"}
                 1 {"Prompt for credentials on secure desktop"}
                 2 {"Prompt for consent on secure desktop"}
@@ -855,9 +995,9 @@ function Get-SecurityInformation {
                 5 {"Prompt for consent for non-Windows binaries (Default)"}
                 default {"Not Configured"}
             }
-            "PromptOnSecureDesktop" = if($uacSettings.PromptOnSecureDesktop -eq 1) {"Enabled (Default)"} elseif($uacSettings.PromptOnSecureDesktop -eq 0) {"Disabled"} else {"Not Configured"}
-            "FilterAdministratorToken" = if($uacSettings.FilterAdministratorToken -eq 1) {"Enabled"} elseif($uacSettings.FilterAdministratorToken -eq 0) {"Disabled (Default)"} else {"Not Configured"}
-            "SecurityStatus" = if($uacSettings.EnableLUA -eq 1) {"Secure"} else {"Potential Security Risk - UAC Disabled"}
+            "Prompt On Secure Desktop" = if($uacSettings.PromptOnSecureDesktop -eq 1) {"Enabled (Default)"} elseif($uacSettings.PromptOnSecureDesktop -eq 0) {"Disabled"} else {"Not Configured"}
+            "Filter Administrator Token" = if($uacSettings.FilterAdministratorToken -eq 1) {"Enabled"} elseif($uacSettings.FilterAdministratorToken -eq 0) {"Disabled (Default)"} else {"Not Configured"}
+            "Security Status" = if($uacSettings.EnableLUA -eq 1) {"Secure"} else {"Potential Security Risk - UAC Disabled"}
         }
     } catch {
         $uacInfo = [PSCustomObject]@{
@@ -870,9 +1010,9 @@ function Get-SecurityInformation {
     try {
         $psExecPolicy = Get-ExecutionPolicy -List | ForEach-Object {
             [PSCustomObject]@{
-                Scope = $_.Scope
-                ExecutionPolicy = $_.ExecutionPolicy
-                SecurityRisk = switch ($_.ExecutionPolicy) {
+                "Scope" = $_.Scope
+                "Execution Policy" = $_.ExecutionPolicy
+                "Security Risk" = switch ($_.ExecutionPolicy) {
                     "Unrestricted" {"High Risk - Allows all scripts"}
                     "Bypass" {"High Risk - Nothing is blocked"}
                     "AllSigned" {"Low Risk - Only signed scripts"}
@@ -902,22 +1042,22 @@ function Get-SecurityInformation {
         $rdpMainPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server"
         $rdpMainSettings = Get-ItemProperty -Path $rdpMainPath -ErrorAction SilentlyContinue
           $rdpSecurity = [PSCustomObject]@{
-            "NetworkLevelAuthentication" = if($rdpSettings.UserAuthentication -eq 1) {"Enabled (Secure)"} elseif($rdpSettings.UserAuthentication -eq 0) {"Disabled (Security Risk)"} else {"Not Configured"}
-            "RDPEnabled" = if($rdpMainSettings.fDenyTSConnections -eq 0) {"Enabled"} elseif($rdpMainSettings.fDenyTSConnections -eq 1) {"Disabled"} else {"Not Configured"}
-            "SecurityLayer" = switch ($rdpSettings.SecurityLayer) {
+            "Network Level Authentication" = if($rdpSettings.UserAuthentication -eq 1) {"Enabled (Secure)"} elseif($rdpSettings.UserAuthentication -eq 0) {"Disabled (Security Risk)"} else {"Not Configured"}
+            "RDP Enabled" = if($rdpMainSettings.fDenyTSConnections -eq 0) {"Enabled"} elseif($rdpMainSettings.fDenyTSConnections -eq 1) {"Disabled"} else {"Not Configured"}
+            "Security Layer" = switch ($rdpSettings.SecurityLayer) {
                 0 {"RDP Security Layer"}
                 1 {"Negotiate (Default)"}
                 2 {"SSL (TLS 1.0)"}
                 default {"Not Configured"}
             }
-            "EncryptionLevel" = switch ($rdpSettings.MinEncryptionLevel) {
+            "Encryption Level" = switch ($rdpSettings.MinEncryptionLevel) {
                 1 {"Low"}
                 2 {"Client Compatible"}
                 3 {"High (Default)"}
                 4 {"FIPS Compliant"}
                 default {"Not Configured"}
             }
-            "SecurityAssessment" = if($rdpSettings.UserAuthentication -eq 1 -and $rdpSettings.MinEncryptionLevel -ge 3) {"Secure Configuration"} else {"Review Required - Security Risks Present"}
+            "Security Assessment" = if($rdpSettings.UserAuthentication -eq 1 -and $rdpSettings.MinEncryptionLevel -ge 3) {"Secure Configuration"} else {"Review Required - Security Risks Present"}
         }
     } catch {
         $rdpSecurity = [PSCustomObject]@{
@@ -945,15 +1085,14 @@ function Get-SecurityInformation {
                         try { $keyUsageExt.Format($false) } catch { "Unable to read" }
                     } else { "Not specified" }
                       $certificates += [PSCustomObject]@{
-                        Subject = if($cert.Subject) { $cert.Subject } else { "Unknown Subject" }
-                        Issuer = if($cert.Issuer) { $cert.Issuer } else { "Unknown Issuer" }
-                        NotBefore = if($cert.NotBefore) { $cert.NotBefore.ToString("yyyy-MM-dd") } else { "Unknown" }
-                        NotAfter = if($cert.NotAfter) { $cert.NotAfter.ToString("yyyy-MM-dd") } else { "Unknown" }
-                        DaysUntilExpiry = $daysUntilExpiry
-                        Thumbprint = if($cert.Thumbprint) { $cert.Thumbprint } else { "Unknown" }
-                        HasPrivateKey = if($null -ne $cert.HasPrivateKey) { $cert.HasPrivateKey } else { "Unknown" }
-                        KeyUsage = $keyUsage
-                        Status = if($daysUntilExpiry -is [int]) {
+                        "Subject" = if($cert.Subject) { $cert.Subject } else { "Unknown Subject" }
+                        "Issuer" = if($cert.Issuer) { $cert.Issuer } else { "Unknown Issuer" }
+                        "Expiration Date" = if($cert.NotAfter) { $cert.NotAfter.ToString("yyyy-MM-dd") } else { "Unknown" }
+                        "Days to Expire" = $daysUntilExpiry
+                        "Thumbprint" = if($cert.Thumbprint) { $cert.Thumbprint } else { "Unknown" }
+                        "Has Private Key" = if($null -ne $cert.HasPrivateKey) { $cert.HasPrivateKey } else { "Unknown" }
+                        "Key Usage" = $keyUsage
+                        "Status" = if($daysUntilExpiry -is [int]) {
                             if($daysUntilExpiry -le 0) {"EXPIRED - Immediate Action Required"} 
                             elseif($daysUntilExpiry -le 30) {"Expires Soon - Action Required"} 
                             elseif($daysUntilExpiry -le 90) {"Monitor - Expires in 3 months"} 
@@ -1005,7 +1144,7 @@ function Get-SecurityInformation {
     $certificates | Export-Csv -Path $CsvCertificates -NoTypeInformation
     $certificatesHtml = $certificates | ConvertTo-Html -Fragment -PreContent "<h2>Certificate Expiry Analysis</h2>"
 
-    # === DNS Client Settings and Security ===
+    # === DNS Client Settings ===
     Write-Host "Collecting DNS Client Settings..." -ForegroundColor Yellow
     try {
         # Get DNS Over HTTPS settings
@@ -1033,11 +1172,11 @@ function Get-SecurityInformation {
         } catch {
             $dnssecStatus = "Not Available"
         }        $dnsSettings = [PSCustomObject]@{
-            DNSServers = (Get-DnsClientServerAddress | Where-Object {$_.AddressFamily -eq 2} | ForEach-Object {"$($_.InterfaceAlias): $($_.ServerAddresses -join ', ')"}) -join "; "
-            DNSOverHTTPS = $dohStatus
-            DNSCache = (Get-DnsClientCache | Measure-Object).Count
-            DNSSuffixSearchList = (Get-DnsClientGlobalSetting).SuffixSearchList -join ", "
-            SecureNameResolution = $dnssecStatus
+            "DNS Servers" = (Get-DnsClientServerAddress | Where-Object {$_.AddressFamily -eq 2} | ForEach-Object {"$($_.InterfaceAlias): $($_.ServerAddresses -join ', ')"}) -join "; "
+            "DNS Over HTTPS" = $dohStatus
+            "DNS Cache" = (Get-DnsClientCache | Measure-Object).Count
+            "DNS Suffix Search List" = (Get-DnsClientGlobalSetting).SuffixSearchList -join ", "
+            "Secure Name Resolution" = $dnssecStatus
         }
     } catch {
         $dnsSettings = [PSCustomObject]@{
@@ -1045,9 +1184,9 @@ function Get-SecurityInformation {
         }
     }
     $dnsSettings | Export-Csv -Path $CsvDNSSettings -NoTypeInformation
-    $dnsSettingsHtml = $dnsSettings | ConvertTo-Html -Fragment -PreContent "<h2>DNS Client Settings and Security</h2>"
+    $dnsSettingsHtml = $dnsSettings | ConvertTo-Html -Fragment -PreContent "<h2>DNS Client Settings</h2>"
 
-    # === Windows Defender Attack Surface Reduction & Exploit Guard ===
+    # === Windows Defender Attack Surface Reduction (ASR) & Exploit Guard ===
     Write-Host "Collecting Windows Defender ASR Settings..." -ForegroundColor Yellow
     try {
         # Get ASR Rules
@@ -1108,11 +1247,11 @@ function Get-SecurityInformation {
         } catch {
             $netProtectionStatus = "Not Available"
         }        $defenderASR = [PSCustomObject]@{
-            ASRRulesEnabled = $asrRulesCount
-            ASRRulesStatus = $asrRulesStatus
-            ControlledFolderAccess = $cfaStatus
-            ExploitProtection = $exploitStatus
-            NetworkProtection = $netProtectionStatus
+            "ASR Rules Enabled" = $asrRulesCount
+            "ASR Rules Status" = $asrRulesStatus
+            "Controlled Folder Access" = $cfaStatus
+            "Exploit Protection" = $exploitStatus
+            "Network Protection" = $netProtectionStatus
         }
     } catch {
         $defenderASR = [PSCustomObject]@{
@@ -1120,7 +1259,7 @@ function Get-SecurityInformation {
         }
     }
     $defenderASR | Export-Csv -Path $CsvDefenderASR -NoTypeInformation
-    $defenderASRHtml = $defenderASR | ConvertTo-Html -Fragment -PreContent "<h2>Windows Defender Attack Surface Reduction & Exploit Guard</h2>"
+    $defenderASRHtml = $defenderASR | ConvertTo-Html -Fragment -PreContent "<h2>Windows Defender Attack Surface Reduction (ASR) & Exploit Guard</h2>"
 
     # === Detailed Exploit Protection Settings ===
     Write-Host "Collecting Exploit Protection Settings..." -ForegroundColor Yellow
@@ -1279,7 +1418,7 @@ function Get-TasksStartupLogsInformation {
         [string]$CsvSecurityLogs
     )
     
-    Write-Host "=== COLLECTING TASKS, STARTUP & LOGS INFORMATION ===" -ForegroundColor Cyan
+    Write-Host "=== COLLECTING Scheduled Tasks, Startup Programs, and Logs INFORMATION ===" -ForegroundColor Cyan
     
     # === Startup Programs ===
     Write-Host "Collecting Startup Programs..." -ForegroundColor Yellow
@@ -1293,18 +1432,28 @@ function Get-TasksStartupLogsInformation {
     $ScheduledTasks = Get-ScheduledTask | Select-Object TaskName, State, Taskpath
     $ScheduledTasksAll = Get-ScheduledTask | Select-Object *
     $ScheduledTasksAll | Export-Csv -Path $CsvScheduledTasksInfo -NoTypeInformation
-    $ScheduledTasksHtml = $ScheduledTasks | ConvertTo-Html -Fragment -PreContent "<h2>Scheduled Tasks</h2>"
-
-    # === Event Viewer Logs Details ===
-    Write-Host "Collecting Event Viewer Logs Details..." -ForegroundColor Yellow
-    $eventlog = Get-EventLog -List  | Select-Object LogDisplayName, MaximumKilobytes, OverflowAction, MinimumRetentionDays, EnableRaisingEvents
+    $ScheduledTasksHtml = $ScheduledTasks | ConvertTo-Html -Fragment -PreContent "<h2>Scheduled Tasks</h2>"    # === Event Viewer Logs Details ===
+    Write-Host "Collecting Event Viewer Logs Size and Retention Details..." -ForegroundColor Yellow
+    $eventlogRaw = Get-EventLog -List  | Select-Object LogDisplayName, MaximumKilobytes, OverflowAction, MinimumRetentionDays, EnableRaisingEvents
     $eventlogAll = Get-EventLog -List  | Select-Object *
+    
+    # Create PSCustomObject array with user-friendly column names
+    $eventlog = $eventlogRaw | ForEach-Object {
+        [PSCustomObject]@{
+            'Log Name' = $_.LogDisplayName
+            'Maximum Log Size (KB)' = $_.MaximumKilobytes
+            'Overflow Action' = $_.OverflowAction
+            'Minimum Retention (Days)' = $_.MinimumRetentionDays
+            'Event Raising Enabled' = $_.EnableRaisingEvents
+        }
+    }
+    
     $eventlogAll | Export-Csv -Path $CsvEventLog -NoTypeInformation
-    $eventlogHtml = $eventlog | ConvertTo-Html -Fragment -PreContent "<h2>Event Viewer Logs Details</h2>"
+    $eventlogHtml = "<div class='table-container'>" + ($eventlog | ConvertTo-Html -Fragment -PreContent "<h2>Event Viewer Logs Size and Retention Details</h2>") + "</div>"
 
-    # === Get Event Viewer Logs for last 7 days ===
-    Write-Host "Collecting Event Logs for last 7 days (Errors and Warnings)..." -ForegroundColor Yellow
-    $startDate = (Get-Date).AddDays(-7)
+    # === Get Event Viewer Logs for last 3 days ===
+    Write-Host "Collecting Event Logs for last 3 days (Errors and Warnings)..." -ForegroundColor Yellow
+    $startDate = (Get-Date).AddDays(-3)
 
     # === Get System logs ===
     Write-Host "  - Processing System logs..." -ForegroundColor Gray
@@ -1348,7 +1497,7 @@ function Get-TasksStartupLogsInformation {
         $Securitylogs = @()
     }
 
-    Write-Host "Tasks, Startup & Logs Information Collection Complete" -ForegroundColor Green
+    Write-Host "Scheduled Tasks, Startup Programs, and Logs Information Collection Complete" -ForegroundColor Green
     
     # Return HTML sections
     return @{
@@ -1554,23 +1703,16 @@ $iconKey = Get-IconHTML -IconName 'key'
 $iconUser = Get-IconHTML -IconName 'user'
 $iconUsers = Get-IconHTML -IconName 'users'
 $iconFolder = Get-IconHTML -IconName 'folder'
-$iconFile = Get-IconHTML -IconName 'file'
-$iconDatabase = Get-IconHTML -IconName 'database'
 $iconClock = Get-IconHTML -IconName 'clock'
 $iconWarning = Get-IconHTML -IconName 'warning'
 $iconCheck = Get-IconHTML -IconName 'check'
 $iconCross = Get-IconHTML -IconName 'cross'
-$iconLightning = Get-IconHTML -IconName 'lightning'
-$iconWrench = Get-IconHTML -IconName 'wrench'
-$iconSearch = Get-IconHTML -IconName 'search'
-$iconRefresh = Get-IconHTML -IconName 'refresh'
 $iconTarget = Get-IconHTML -IconName 'target'
 $iconMemory = Get-IconHTML -IconName 'memory'
 $iconDisk = Get-IconHTML -IconName 'disk'
 $iconCpu = Get-IconHTML -IconName 'cpu'
 $iconProcess = Get-IconHTML -IconName 'process'
 $iconService = Get-IconHTML -IconName 'service'
-$iconUpdate = Get-IconHTML -IconName 'update'
 $iconProgram = Get-IconHTML -IconName 'program'
 $iconPort = Get-IconHTML -IconName 'port'
 $iconFirewall = Get-IconHTML -IconName 'firewall'
@@ -1581,11 +1723,59 @@ $iconAudit = Get-IconHTML -IconName 'audit'
 $iconTask = Get-IconHTML -IconName 'task'
 $iconStartup = Get-IconHTML -IconName 'startup'
 $iconLog = Get-IconHTML -IconName 'log'
-$iconEye = Get-IconHTML -IconName 'eye'
-$iconHome = Get-IconHTML -IconName 'home'
-$iconInfo = Get-IconHTML -IconName 'info'
 $iconMenu = Get-IconHTML -IconName 'menu'
 Write-Host "Icons loaded successfully" -ForegroundColor Green
+
+# Create dynamic assessment areas based on menu selection
+$assessmentAreas = ""
+if ($collectSystemOnly) {
+    $assessmentAreas = @"
+                        <li>OS Details, CPU, Memory, Disk Information</li>
+                        <li>Windows Features, Services, Programs</li>
+                        <li>Updates and Processes</li>
+"@
+} elseif ($collectNetworkOnly) {
+    $assessmentAreas = @"
+                        <li>Network Interface Configuration</li>
+                        <li>Traffic Statistics and Performance</li>
+                        <li>Open Ports and Connections</li>
+"@
+} elseif ($collectSecurityOnly) {
+    $assessmentAreas = @"
+                        <li>Antivirus and Firewall Settings</li>
+                        <li>User Accounts and Password Policies</li>
+                        <li>Security Configurations and Certificates</li>
+"@
+} elseif ($collectTasksOnly) {
+    $assessmentAreas = @"
+                        <li>Startup Programs and Services</li>
+                        <li>Scheduled Tasks Configuration</li>
+                        <li>System, Application & Security Event Logs</li>
+"@
+} else {
+    $assessmentAreas = @"
+                        <li>System configuration and performance metrics</li>
+                        <li>Network interface configuration and traffic</li>
+                        <li>Security settings and policies</li>
+                        <li>User accounts and access controls</li>
+                        <li>Services and scheduled tasks</li>
+                        <li>Event logs and system monitoring</li>
+"@
+}
+
+# Create dynamic assessment categories based on menu selection
+$assessmentCategories = ""
+if ($collectSystemOnly) {
+    $assessmentCategories = "System"
+} elseif ($collectNetworkOnly) {
+    $assessmentCategories = "Network"
+} elseif ($collectSecurityOnly) {
+    $assessmentCategories = "Security"
+} elseif ($collectTasksOnly) {
+    $assessmentCategories = "Scheduled Tasks, Startup Programs, and Logs"
+} else {
+    $assessmentCategories = "System, Network, Security, Scheduled Tasks, Startup Programs, and Logs"
+}
 
 $fullHtml = @"
 <!DOCTYPE html>
@@ -1760,7 +1950,9 @@ $fullHtml = @"
         }
         
         .nav-item.expanded .nav-submenu {
-            max-height: 500px;
+            max-height: max-content;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
         }
         
         .nav-submenu-item {
@@ -1915,8 +2107,7 @@ $fullHtml = @"
             border-radius: 0 0 8px 8px;
             padding: 15px 20px;
         }
-        
-        /* Table Styles */
+          /* Table Styles */
         table { 
             border-collapse: collapse; 
             width: 100%; 
@@ -1931,20 +2122,19 @@ $fullHtml = @"
             text-align: left; 
             border-bottom: 1px solid #e2e8f0;
         }
-        
-        th { 
+          th { 
             background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
             color: white;
             font-weight: 600;
-            text-transform: uppercase;
+            text-transform: capitalize;
             font-size: 0.9em;
+            position: relative;
         }
         
         tr:nth-child(even) { 
             background-color: #f8f9fa; 
         }
-        
-        tr:hover { 
+          tr:hover { 
             background-color: #e3f2fd; 
             transition: background-color 0.2s;
         }
@@ -2076,9 +2266,7 @@ $fullHtml = @"
                     // Scroll to top of main content
                     document.querySelector('.main-content').scrollTop = 0;
                 });
-            });
-            
-            // Auto-expand first menu item with submenus on load
+            });            // Auto-expand first menu item with submenus on load
             const firstSubmenu = document.querySelector('.nav-item.has-submenu');
             if (firstSubmenu) {
                 firstSubmenu.classList.add('expanded');
@@ -2243,10 +2431,10 @@ if (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecu
     $tasksSectionCount = 3
     $fullHtml += @"
                 <div class="nav-item has-submenu">
-                    <a href="#" data-section="tasks-logs">$iconTask Tasks, Startup & Logs <span class="section-count">$tasksSectionCount</span></a>
+                    <a href="#" data-section="tasks-logs">$iconTask Tasks, Startup, and Logs <span class="section-count">$tasksSectionCount</span></a>
                     <div class="nav-submenu">
                         <div class="nav-submenu-item">
-                            <a href="#" data-section="tasks-logs" data-subsection="event-logs">$iconLog Event Logs</a>
+                            <a href="#" data-section="tasks-logs" data-subsection="event-logs">$iconLog Event Logs Size and Retention</a>
                         </div>
                         <div class="nav-submenu-item">
                             <a href="#" data-section="tasks-logs" data-subsection="startup-programs">$iconStartup Startup Programs</a>
@@ -2304,7 +2492,7 @@ if (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecu
     $fullHtml += @"
                         <div class="summary-item">
                             <span class="summary-number">3</span>
-                            <span class="summary-label">Tasks & Logs</span>
+                            <span class="summary-label">Scheduled Tasks, Startup, and Logs Sections</span>
                         </div>
 "@
 }
@@ -2327,17 +2515,11 @@ $fullHtml += @"
                     <ul style="margin-left: 20px; margin-top: 10px;">
                         <li><strong>Interactive HTML Report:</strong> This comprehensive report with collapsible navigation</li>
                         <li><strong>CSV Data Files:</strong> Individual CSV files for data analysis and integration</li>
-                        <li><strong>Assessment Categories:</strong> Covering System, Network, Security, and Tasks</li>
-                    </ul>
-                    <br>
+                        <li><strong>Assessment Scope:</strong> Covering $assessmentCategories</li>
+                    </ul>                    <br>
                     <h3>$iconTarget Key Areas Assessed:</h3>
                     <ul style="margin-left: 20px; margin-top: 10px;">
-                        <li>System configuration and performance metrics</li>
-                        <li>Network interface configuration and traffic</li>
-                        <li>Security settings and policies</li>
-                        <li>User accounts and access controls</li>
-                        <li>Services and scheduled tasks</li>
-                        <li>Event logs and system monitoring</li>
+$assessmentAreas
                     </ul>
                 </div>
             </div>
@@ -2686,12 +2868,12 @@ if (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecu
             <!-- Tasks, Startup & Logs Section -->
             <div id="tasks-logs" class="section">
                 <div class="section-header">
-                    <h2>$iconTask Tasks, Startup & Logs</h2>
+                    <h2>$iconTask Scheduled Tasks, Startup, and Logs Retention</h2>
                 </div>
                 <div class="section-content">
                     <div id="event-logs" class="subsection">
                         <div class="subsection-header">
-                            <h3>$iconLog Event Logs</h3>
+                            <h3>$iconLog Event Logs Size and Retention</h3>
                         </div>
                         <div class="subsection-content">
                             $eventlogHtml
@@ -2740,11 +2922,9 @@ $fullHtml += @"
                 Abdullah Zmaili
             </div>
             <div class="footer-item">
-                <strong>Server Assessed:</strong><br>
-                $(hostname)
+                <strong>Server Assessed:</strong><br>                $(hostname)
             </div>
-        </div>
-    </div>
+        </div>    </div>
     
 </body>
 </html>

@@ -1,5 +1,12 @@
 # Windows Server Assessment Tool - Quick Reference
 
+## 🆕 What's New in Latest Version
+- **User-Friendly Column Names**: Descriptive headers instead of technical property names
+- **Responsive Tables**: Auto-sizing tables with horizontal scrolling for wide data
+- **Dynamic Report Content**: Report sections automatically reflect your menu selection
+- **Enhanced Data Presentation**: PSCustomObject implementation throughout
+- **Improved Table Headers**: Proper capitalization (Title Case instead of ALL CAPS)
+
 ## Quick Start
 1. **Run PowerShell as Administrator**
 2. **Navigate to script directory**
@@ -14,15 +21,17 @@
 - 🎯 **Targeted Assessment Modes** for focused analysis
 - 📁 **Professional CSV Exports** for detailed data
 - 📱 **Responsive Design** optimized for desktop/tablet
+- 🔄 **Dynamic Content** that adapts to your selection
+- 📋 **User-Friendly Data** with descriptive column names
 
 ## Menu Options
-| Option | Mode | Description |
-|--------|------|-------------|
-| 1 | System Assessment Only | OS, CPU, Memory, Disk, Services, Programs |
-| 2 | Network Assessment Only | NICs, Traffic, Open Ports |
-| 3 | Security Assessment Only | AV, Firewall, Users, Certificates |
-| 4 | Tasks & Logs Assessment Only | Startup, Scheduled Tasks, Event Logs |
-| 5 | All Sections | Complete comprehensive server assessment |
+| Option | Mode | Sections | Description |
+|--------|------|----------|-------------|
+| 1 | System Assessment Only | 13 sections | OS, CPU, Memory, Disk, Services, Programs |
+| 2 | Network Assessment Only | 3 sections | NICs, Traffic, Open Ports |
+| 3 | Security Assessment Only | 17 sections | AV, Firewall, Users, Certificates |
+| 4 | Tasks & Logs Assessment Only | 3 sections | Startup, Scheduled Tasks, Event Logs |
+| 5 | All Sections | 36 sections | Complete comprehensive server assessment |
 
 ## Output Files by Assessment Mode
 
