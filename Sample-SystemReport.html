@@ -1,0 +1,1062 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>System Health Check Report for Windows Server</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* Icon Styles */
+        .icon-emoji {
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        
+        .nav-item .icon-emoji, .nav-submenu-item .icon-emoji {
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .section-header .icon-emoji, .subsection-header .icon-emoji {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        
+        h2 .icon-emoji {
+            font-size: 20px;
+        }
+        
+        h3 .icon-emoji {
+            font-size: 16px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #f8f9fa; 
+            line-height: 1.6;
+        }
+        
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #0078D7 0%, #005a9e 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .header-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .header-info p {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin: 0;
+        }
+        
+        /* Layout Container */
+        .container {
+            display: flex;
+            min-height: calc(100vh - 140px);
+        }
+        
+        /* Left Navigation Menu */
+        .nav-menu {
+            width: 320px;
+            background: #2d3748;
+            color: white;
+            padding: 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-menu.collapsed {
+            width: 60px;
+        }
+        
+        .nav-toggle {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-toggle:hover {
+            background: #3182ce;
+        }
+        
+        .nav-toggle:after {
+            content: '\25C0';
+            float: right;
+            transition: transform 0.3s;
+        }
+        
+        .nav-menu.collapsed .nav-toggle:after {
+            transform: rotate(180deg);
+        }
+        
+        .nav-items {
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-menu.collapsed .nav-items {
+            opacity: 0;
+        }
+        
+        .nav-item {
+            border-bottom: 1px solid #4a5568;
+        }
+        
+        .nav-item a {
+            display: block;
+            padding: 15px 20px;
+            color: #e2e8f0;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .nav-item a:hover {
+            background: #4a5568;
+            color: white;
+            padding-left: 25px;
+        }
+        
+        .nav-item.active a {
+            background: #4299e1;
+            color: white;
+            border-left: 4px solid #63b3ed;
+        }
+        
+        /* Sub-section styles */
+        .nav-item.has-submenu > a:after {
+            content: '\25B6';
+            float: right;
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+        
+        .nav-item.has-submenu.expanded > a:after {
+            transform: rotate(90deg);
+        }
+        
+        .nav-submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #1a202c;
+        }
+        
+        .nav-item.expanded .nav-submenu {
+            max-height: max-content;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .nav-submenu-item {
+            border-bottom: 1px solid #2d3748;
+        }
+        
+        .nav-submenu-item a {
+            padding: 12px 40px;
+            font-size: 14px;
+            color: #cbd5e0;
+            background: transparent;
+        }
+        
+        .nav-submenu-item a:hover {
+            background: #2d3748;
+            color: white;
+            padding-left: 45px;
+        }
+        
+        .nav-submenu-item.active a {
+            background: #2b77e6;
+            color: white;
+            border-left: 3px solid #63b3ed;
+        }
+        
+        .section-count {
+            float: right;
+            background: #4299e1;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            background: white;
+            margin: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        /* Summary Cards */
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .summary-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .summary-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .summary-label {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+        
+        /* Section Styles */
+        .section {
+            margin-bottom: 30px;
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .subsection {
+            margin-bottom: 25px;
+            display: none;
+        }
+        
+        .subsection.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #0078D7 0%, #005a9e 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            margin-bottom: 0;
+        }
+        
+        .section-header h2 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        
+        .subsection-header {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            margin-top: 20px;
+        }
+        
+        .subsection-header:first-child {
+            margin-top: 0;
+        }
+        
+        .subsection-header h3 {
+            margin: 0;
+            font-size: 1.3em;
+        }
+        
+        .section-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 20px;
+        }
+        
+        .subsection-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 15px 20px;
+        }
+          /* Table Styles */
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th, td { 
+            padding: 12px 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #e2e8f0;
+        }
+          th { 
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            font-weight: 600;
+            text-transform: capitalize;
+            font-size: 0.9em;
+            position: relative;
+        }
+        
+        tr:nth-child(even) { 
+            background-color: #f8f9fa; 
+        }
+          tr:hover { 
+            background-color: #e3f2fd; 
+            transition: background-color 0.2s;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .nav-menu {
+                width: 100%;
+                order: 2;
+            }
+            
+            .main-content {
+                order: 1;
+                margin: 10px;
+            }
+            
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Footer */
+        .footer {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .footer-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .footer-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .footer-item strong {
+            color: #63b3ed;
+        }
+    </style>
+    
+    <script>
+        // Navigation functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle navigation menu
+            const navToggle = document.querySelector('.nav-toggle');
+            const navMenu = document.querySelector('.nav-menu');
+            
+            navToggle.addEventListener('click', function() {
+                navMenu.classList.toggle('collapsed');
+            });
+            
+            // Handle main section and sub-section navigation
+            const navLinks = document.querySelectorAll('.nav-item a, .nav-submenu-item a');
+            const sections = document.querySelectorAll('.section');
+            const subsections = document.querySelectorAll('.subsection');
+            
+            // Show summary section by default
+            document.getElementById('summary').classList.add('active');
+            document.querySelector('[data-section="summary"]').parentElement.classList.add('active');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const sectionId = this.getAttribute('data-section');
+                    const subsectionId = this.getAttribute('data-subsection');
+                    
+                    // Handle submenu toggle for main section links with submenus
+                    if (this.parentElement.classList.contains('has-submenu') && !subsectionId) {
+                        this.parentElement.classList.toggle('expanded');
+                        return;
+                    }
+                    
+                    // Remove active class from all nav items and sections
+                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                    document.querySelectorAll('.nav-submenu-item').forEach(item => item.classList.remove('active'));
+                    sections.forEach(s => s.classList.remove('active'));
+                    subsections.forEach(s => s.classList.remove('active'));
+                    
+                    // Show the main section
+                    const targetSection = document.getElementById(sectionId);
+                    if (targetSection) {
+                        targetSection.classList.add('active');
+                    }
+                    
+                    // Handle subsection navigation
+                    if (subsectionId) {
+                        // Add active class to the submenu item
+                        this.parentElement.classList.add('active');
+                        
+                        // Make sure the parent menu is expanded
+                        const parentNavItem = this.closest('.nav-item.has-submenu');
+                        if (parentNavItem) {
+                            parentNavItem.classList.add('expanded');
+                        }
+                        
+                        // Hide all subsections in the target section
+                        const targetSectionSubsections = targetSection.querySelectorAll('.subsection');
+                        targetSectionSubsections.forEach(sub => sub.classList.remove('active'));
+                        
+                        // Show the specific subsection
+                        const targetSubsection = document.getElementById(subsectionId);
+                        if (targetSubsection) {
+                            targetSubsection.classList.add('active');
+                        }
+                    } else {
+                        // If no subsection specified, show all subsections in the section
+                        const targetSectionSubsections = targetSection.querySelectorAll('.subsection');
+                        targetSectionSubsections.forEach(sub => sub.classList.add('active'));
+                        
+                        // Add active class to the main nav item
+                        this.parentElement.classList.add('active');
+                    }
+                    
+                    // Scroll to top of main content
+                    document.querySelector('.main-content').scrollTop = 0;
+                });
+            });            // Auto-expand first menu item with submenus on load
+            const firstSubmenu = document.querySelector('.nav-item.has-submenu');
+            if (firstSubmenu) {
+                firstSubmenu.classList.add('expanded');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="header">
+        <h1>System Health Check Report</h1>
+        <div class="header-info">
+            <p><strong>Generated:</strong> 2025-06-20 21:58:29</p>
+            <p><strong>Host Name:</strong> SP1</p>
+            <p><strong>User:</strong> abc\administrator</p>
+            <p><strong>Scope:</strong> Complete Health Check (All Sections - 36 sections)</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <nav class="nav-menu">
+            <button class="nav-toggle"><span class="icon-emoji">&#9776;</span> Navigation Menu</button>
+            <div class="nav-items">
+                <div class="nav-item">
+                    <a href="#" data-section="summary"><span class="icon-emoji">&#128203;</span> Executive Summary</a>
+                </div>                <div class="nav-item has-submenu">
+                    <a href="#" data-section="system-info"><span class="icon-emoji">&#128187;</span> System Information <span class="section-count">13</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="os-info"><span class="icon-emoji">&#128421;</span> Operating System</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="uptime"><span class="icon-emoji">&#128336;</span> System Uptime</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="cpu-info"><span class="icon-emoji">&#128421;</span> CPU Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="cpu-usage"><span class="icon-emoji">&#128202;</span> CPU Usage</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="memory"><span class="icon-emoji">&#129504;</span> Memory Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="disk"><span class="icon-emoji">&#128190;</span> Disk Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="programs"><span class="icon-emoji">&#128230;</span> Installed Programs</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="updates"><span class="icon-emoji">&#9989;</span> Installed Updates</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="missing-updates"><span class="icon-emoji">&#9888;</span> Missing Updates</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="processes"><span class="icon-emoji">&#9881;</span> Running Processes</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="running-services"><span class="icon-emoji">&#128295;</span> Running Services</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="stopped-services"><span class="icon-emoji">&#10060;</span> Stopped Services</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="system-info" data-subsection="features"><span class="icon-emoji">&#9881;</span> Windows Features</a>
+                        </div>
+                    </div>
+                </div>                <div class="nav-item has-submenu">
+                    <a href="#" data-section="network-info"><span class="icon-emoji">&#127760;</span> Network Information <span class="section-count">3</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="network-info" data-subsection="network-interfaces"><span class="icon-emoji">&#127760;</span> Network Interfaces</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="network-info" data-subsection="traffic"><span class="icon-emoji">&#128202;</span> Traffic Information</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="network-info" data-subsection="open-ports"><span class="icon-emoji">&#128268;</span> Open Ports</a>
+                        </div>
+                    </div>
+                </div>                <div class="nav-item has-submenu">
+                    <a href="#" data-section="security-info"><span class="icon-emoji">&#128737;</span> Security Information <span class="section-count">17</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="smbv1"><span class="icon-emoji">&#9888;</span> SMBv1 Status</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="password-policy"><span class="icon-emoji">&#128273;</span> Password Policy</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="inactive-accounts"><span class="icon-emoji">&#128100;</span> Inactive Accounts</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="local-admins"><span class="icon-emoji">&#128101;</span> Local Administrators</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="tls-settings"><span class="icon-emoji">&#128274;</span> TLS Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="uac"><span class="icon-emoji">&#128737;</span> UAC Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="antivirus"><span class="icon-emoji">&#128737;</span> Antivirus Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="firewall-status"><span class="icon-emoji">&#128293;</span> Firewall Status</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="firewall-settings"><span class="icon-emoji">&#9881;</span> Firewall Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="ps-policy"><span class="icon-emoji">&#9881;</span> PowerShell Policy</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="rdp-security"><span class="icon-emoji">&#128274;</span> RDP Security</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="certificates"><span class="icon-emoji">&#128196;</span> Certificates</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="dns-settings"><span class="icon-emoji">&#127760;</span> DNS Settings</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="defender-asr"><span class="icon-emoji">&#128737;</span> Defender ASR</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="exploit-protection"><span class="icon-emoji">&#128737;</span> Exploit Protection</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="shares"><span class="icon-emoji">&#128193;</span> SMB Shares</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="security-info" data-subsection="audit-settings"><span class="icon-emoji">&#128202;</span> Audit Settings</a>
+                        </div>
+                    </div>
+                </div>                <div class="nav-item has-submenu">
+                    <a href="#" data-section="tasks-logs"><span class="icon-emoji">&#128203;</span> Tasks, Startup, and Logs <span class="section-count">3</span></a>
+                    <div class="nav-submenu">
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="tasks-logs" data-subsection="event-logs"><span class="icon-emoji">&#128221;</span> Event Logs Size and Retention</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="tasks-logs" data-subsection="startup-programs"><span class="icon-emoji">&#128640;</span> Startup Programs</a>
+                        </div>
+                        <div class="nav-submenu-item">
+                            <a href="#" data-section="tasks-logs" data-subsection="scheduled-tasks"><span class="icon-emoji">&#128203;</span> Scheduled Tasks</a>
+                        </div>
+                    </div>
+                </div>            </div>
+        </nav>
+        
+        <main class="main-content">
+            <!-- Executive Summary Section -->
+            <div id="summary" class="section">
+                <div class="summary-card">
+                    <h2 style="color: white; margin-bottom: 20px;"><span class="icon-emoji">&#128202;</span> Windows Server Assessment Summary</h2>
+                    <div class="summary-grid">                        <div class="summary-item">
+                            <span class="summary-number">13</span>
+                            <span class="summary-label">System Sections</span>
+                        </div>                        <div class="summary-item">
+                            <span class="summary-number">3</span>
+                            <span class="summary-label">Network Sections</span>
+                        </div>                        <div class="summary-item">
+                            <span class="summary-number">17</span>
+                            <span class="summary-label">Security Sections</span>
+                        </div>                        <div class="summary-item">
+                            <span class="summary-number">3</span>
+                            <span class="summary-label">Scheduled Tasks, Startup, and Logs Sections</span>
+                        </div>                        <div class="summary-item">
+                            <span class="summary-number">1</span>
+                            <span class="summary-label">HTML Report</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section-header">
+                    <h2><span class="icon-emoji">&#128203;</span> Assessment Overview</h2>
+                </div>
+                <div class="section-content">
+                    <p>This comprehensive Windows Server assessment report provides detailed analysis across multiple categories. The report includes both technical configuration details and security posture analysis.</p>
+                    <br>
+                    <h3><span class="icon-emoji">&#128193;</span> Report Components:</h3>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>Interactive HTML Report:</strong> This comprehensive report with collapsible navigation</li>
+                        <li><strong>CSV Data Files:</strong> Individual CSV files for data analysis and integration</li>
+                        <li><strong>Assessment Scope:</strong> Covering System, Network, Security, Scheduled Tasks, Startup Programs, and Logs</li>
+                    </ul>                    <br>
+                    <h3><span class="icon-emoji">&#127919;</span> Key Areas Assessed:</h3>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>System configuration and performance metrics</li>
+                        <li>Network interface configuration and traffic</li>
+                        <li>Security settings and policies</li>
+                        <li>User accounts and access controls</li>
+                        <li>Services and scheduled tasks</li>
+                        <li>Event logs and system monitoring</li>
+                    </ul>
+                </div>
+            </div>            
+            <!-- System Information Section -->
+            <div id="system-info" class="section">
+                <div class="section-header">
+                    <h2><span class="icon-emoji">&#128187;</span> System Information</h2>
+                </div>
+                <div class="section-content">
+                    <div id="os-info" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128421;</span> Operating System Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>OS Details</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Operating System</th><th>OS Architecture</th><th>Computer Name</th><th>OS Version</th><th>OS Build Number</th><th>Server/Client</th><th>OS Installation Date</th></tr> <tr><td>Microsoft Windows Server 2016 Standard</td><td>64-bit</td><td>SP1</td><td>10.0.14393</td><td>14393</td><td>Server</td><td>15 June 2025 7:56:54 AM</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="uptime" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128336;</span> System Uptime</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>System Uptime</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Days</th><th>Hours</th><th>Minutes</th></tr> <tr><td>0</td><td>0</td><td>3</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="cpu-info" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128421;</span> CPU Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>CPU Details</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>CPU Name</th><th>Manufacturer</th><th>Physical Cores</th><th>Logical Cores</th><th>Utilization Percentage</th></tr> <tr><td>Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz</td><td>GenuineIntel</td><td>2</td><td>4</td><td>7</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="cpu-usage" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128202;</span> CPU Usage</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>CPU Usage</h2> <table> <colgroup><col/><col/></colgroup> <tr><th>Logical Core</th><th>Logical Core Utilization Percentage(%)</th></tr> <tr><td>0</td><td>98.44</td></tr> <tr><td>1</td><td>98.44</td></tr> <tr><td>2</td><td>96.88</td></tr> <tr><td>3</td><td>95.31</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="memory" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#129504;</span> Memory Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>RAM Details</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>Total RAM(GB)</th><th>Used RAM(GB)</th><th>RAM Utilization Percentage(%)</th><th>Free RAM(GB)</th><th>Free RAM Percentage(%)</th></tr> <tr><td>8</td><td>5.94</td><td>74.24</td><td>2.06</td><td>25.76</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="disk" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128190;</span> Disk Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Disk Details</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Partition</th><th>Drive Type</th><th>File System</th><th>Total Size(GB)</th><th>Used Space(GB)</th><th>Free Space(GB)</th><th>Free Percentage(%)</th><th>VolumeName</th><th>Description</th></tr> <tr><td>C:</td><td>Local Disk</td><td>NTFS</td><td>126.45</td><td>34.73</td><td>91.72</td><td>72.53</td><td></td><td>Local Fixed Disk</td></tr> <tr><td>D:</td><td>CD-ROM</td><td>CDFS</td><td>1.34</td><td>1.34</td><td>0</td><td>0</td><td>SqlSetup_x64_ENU</td><td>CD-ROM Disc</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="programs" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128230;</span> Installed Programs</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Installed Programs</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>Program Name</th><th>Program Version</th><th>Publisher</th><th>Size (MB)</th><th>Installed Date</th></tr> <tr><td>Active Directory Rights Management Services Client 2.1</td><td>1.0.5406.9</td><td>Microsoft Corporation</td><td>118638</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>AppFabric 1.1 for Windows Server</td><td>1.1.2106.32</td><td>Microsoft Corporation</td><td>24608</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Azure Data Studio</td><td>1.37.0</td><td>Microsoft Corporation</td><td>583683</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Browser for SQL Server 2019</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>22536</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Integration Services</td><td>15.0.2000.229</td><td>Microsoft Corporation</td><td>182088</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Analysis Services OLE DB Provider</td><td>15.0.2000.832</td><td>Microsoft Corporation</td><td>536044</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft CCR and DSS Runtime 2008 R3</td><td>2.2.760</td><td>Microsoft Corporation</td><td>1291</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Edge</td><td>137.0.3296.93</td><td>Microsoft Corporation</td><td>780082</td><td>20 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Help Viewer 2.3</td><td>2.3.28307</td><td>Microsoft Corporation</td><td>6627</td><td>N/A</td></tr> <tr><td>Microsoft Identity Extensions</td><td>2.0.1459.0</td><td>Microsoft Corporation</td><td>118</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft ODBC Driver 11 for SQL Server</td><td>12.2.5543.11</td><td>Microsoft Corporation</td><td>14174</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft ODBC Driver 17 for SQL Server</td><td>17.7.2.1</td><td>Microsoft Corporation</td><td>14368</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft OLE DB Driver for SQL Server</td><td>18.5.0.0</td><td>Microsoft Corporation</td><td>22864</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Server Proof (Arabic) 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>17864</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Server Proof (English) 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>3184</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Server Proof (French) 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>3704</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Server Proof (German) 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>8680</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Server Proof (Russian) 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>3832</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Server Proof (Spanish) 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>4024</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SharePoint Foundation 2016 1033 Lang Pack</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>214542</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SharePoint Foundation 2016 Core</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>1911076</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SharePoint Server 2016</td><td>16.0.4351.1000</td><td>Microsoft Corporation</td><td>199013</td><td>N/A</td></tr> <tr><td>Microsoft SQL Server 2005 Analysis Services ADOMD.NET</td><td>9.00.1399.06</td><td>Microsoft Corporation</td><td>15378</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SQL Server 2012 Native Client </td><td>11.4.7462.6</td><td>Microsoft Corporation</td><td>19888</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SQL Server 2019 (64-bit)</td><td></td><td>Microsoft Corporation</td><td></td><td>N/A</td></tr> <tr><td>Microsoft SQL Server 2019 RsFx Driver</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>776</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SQL Server 2019 Setup (English)</td><td>15.0.4034.2</td><td>Microsoft Corporation</td><td>139356</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SQL Server 2019 T-SQL Language Service </td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>18544</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft SQL Server Management Studio - 18.12.1</td><td>15.0.18424.0</td><td>Microsoft Corporation</td><td>2452581</td><td>N/A</td></tr> <tr><td>Microsoft Sync Framework Runtime v1.0 SP1 (x64)</td><td>1.0.3010.0</td><td>Microsoft Corporation</td><td>2036</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2012 Redistributable (x64) - 11.0.61030</td><td>11.0.61030.0</td><td>Microsoft Corporation</td><td>21014</td><td>N/A</td></tr> <tr><td>Microsoft Visual C++ 2012 x64 Minimum Runtime - 11.0.61030</td><td>11.0.61030</td><td>Microsoft Corporation</td><td>1086</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2013 Redistributable (x86) - 12.0.40664</td><td>12.0.40664.0</td><td>Microsoft Corporation</td><td>17602</td><td>N/A</td></tr> <tr><td>Microsoft Visual C++ 2013 x86 Additional Runtime - 12.0.40664</td><td>12.0.40664</td><td>Microsoft Corporation</td><td>5097</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2013 x86 Minimum Runtime - 12.0.40664</td><td>12.0.40664</td><td>Microsoft Corporation</td><td>1253</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2017 Redistributable (x64) - 14.14.26429</td><td>14.14.26429.4</td><td>Microsoft Corporation</td><td>23804</td><td>N/A</td></tr> <tr><td>Microsoft Visual C++ 2017 Redistributable (x86) - 14.14.26429</td><td>14.14.26429.4</td><td>Microsoft Corporation</td><td>20949</td><td>N/A</td></tr> <tr><td>Microsoft Visual C++ 2017 x64 Additional Runtime - 14.14.26429</td><td>14.14.26429</td><td>Microsoft Corporation</td><td>5884</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2017 x64 Minimum Runtime - 14.14.26429</td><td>14.14.26429</td><td>Microsoft Corporation</td><td>1772</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2017 x86 Additional Runtime - 14.14.26429</td><td>14.14.26429</td><td>Microsoft Corporation</td><td>5417</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual C++ 2017 x86 Minimum Runtime - 14.14.26429</td><td>14.14.26429</td><td>Microsoft Corporation</td><td>1612</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual Studio Tools for Applications 2017</td><td>15.0.27520</td><td>Microsoft Corporation</td><td>39300</td><td>N/A</td></tr> <tr><td>Microsoft Visual Studio Tools for Applications 2017 x64 Hosting Support</td><td>15.0.27520</td><td>Microsoft Corporation</td><td>5728</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft Visual Studio Tools for Applications 2017 x86 Hosting Support</td><td>15.0.27520</td><td>Microsoft Corporation</td><td>2579</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Microsoft VSS Writer for SQL Server 2019</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>3648</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Batch Parser</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>1568</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Common Files</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>81512</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Connection Info</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>200</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Database Engine Services</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>3912</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Database Engine Shared</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>210680</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 DMF</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>200</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Shared Management Objects</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>200</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 Shared Management Objects Extensions</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>6320</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 SQL Diagnostics</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>1072</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server 2019 XEvent</td><td>15.0.2000.5</td><td>Microsoft Corporation</td><td>1704</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server Management Studio</td><td>15.0.18424.0</td><td>Microsoft Corporation</td><td>284114</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server Management Studio for Analysis Services</td><td>15.0.18424.0</td><td>Microsoft Corporation</td><td>345594</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SQL Server Management Studio for Reporting Services</td><td>15.0.18424.0</td><td>Microsoft Corporation</td><td>53680</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>SSMS Post Install Tasks</td><td>15.0.18424.0</td><td>Microsoft Corporation</td><td>592</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Visual Studio 2017 Isolated Shell for SSMS</td><td>15.0.28307.421</td><td>Microsoft Corporation</td><td>461234</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6 Tools</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>71623</td><td>N/A</td></tr> <tr><td>WCF Data Services 5.6.0 CHS Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>4776</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 CHT Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>4680</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 DEU Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>5240</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 ESN Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>5128</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 FRA Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>5344</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 ITA Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>5208</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 JPN Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>5816</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 KOR Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>4976</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 Runtime</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>10885</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>WCF Data Services 5.6.0 RUS Language Pack</td><td>5.6.61587.0</td><td>Microsoft Corporation</td><td>5832</td><td>15 June 2025 12:00:00 AM</td></tr> <tr><td>Windows Server AppFabric v1.1 CU7 [KB3092423]LDR</td><td>1.1.2106.32</td><td>Microsoft Corporation</td><td>3814</td><td>N/A</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="updates" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9989;</span> Installed Updates</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Updates Installed</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Hot Fix ID</th><th>Installed On</th><th>Installed By</th></tr> <tr><td>KB4054590</td><td>6/15/2025 12:00:00 AM</td><td>ABC\Administrator</td></tr> <tr><td>KB4048953</td><td>2/2/2018 12:00:00 AM</td><td>NT AUTHORITY\SYSTEM</td></tr> <tr><td>KB4049065</td><td>2/2/2018 12:00:00 AM</td><td>NT AUTHORITY\SYSTEM</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="missing-updates" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9888;</span> Missing Updates</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Missing Windows Updates</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Missing Windows Update</th><th>KB</th><th>Size (MB)</th></tr> <tr><td>2018-05 Cumulative Update for Windows Server 2016 for x64-based Systems (KB4103720)</td><td>4103720</td><td>1273.25</td></tr> <tr><td>Windows Malicious Software Removal Tool x64 - v5.134 (KB890830)</td><td>890830</td><td>80.54</td></tr> <tr><td>2025-06 Servicing Stack Update for Windows Server 2016 for x64-based Systems (KB5060954)</td><td>5060954</td><td>11.63</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="processes" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9881;</span> Running Processes</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <div class='table-container'><h2>Current Running Processes</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Process ID</th><th>Session ID</th><th>Process Name</th><th>Start Time</th><th>User CPU Time</th><th>Total CPU Time</th><th>CPU %</th><th>Description</th><th>User Name</th><th>Executable Path</th></tr> <tr><td>2184</td><td>0</td><td>c2wtshost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.2</td><td> </td><td>NT AUTHORITY\SYSTEM</td><td>C:\Program Files\Windows Identity Foundation\v3.5\c2wtshost.exe</td></tr> <tr><td>5064</td><td>0</td><td>conhost</td><td>2025-06-20 21:50:11</td><td>00:00:00</td><td>00:00:00</td><td>0.12</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>5384</td><td>0</td><td>conhost</td><td>2025-06-20 21:50:31</td><td>00:00:00</td><td>00:00:00</td><td>0.05</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>5556</td><td>0</td><td>conhost</td><td>2025-06-20 21:50:22</td><td>00:00:00</td><td>00:00:00</td><td>N/A</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>5848</td><td>0</td><td>conhost</td><td>2025-06-20 21:50:26</td><td>00:00:00</td><td>00:00:00</td><td>0.08</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>5868</td><td>0</td><td>conhost</td><td>2025-06-20 21:50:26</td><td>00:00:00</td><td>00:00:00</td><td>0.08</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>6072</td><td>0</td><td>conhost</td><td>2025-06-20 21:50:30</td><td>00:00:00</td><td>00:00:00</td><td>0.11</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>10588</td><td>1</td><td>conhost</td><td>2025-06-20 21:52:13</td><td>00:00:00</td><td>00:00:00</td><td>0.33</td><td>Console Window Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\conhost.exe</td></tr> <tr><td>436</td><td>0</td><td>csrss</td><td>2025-06-20 21:49:30</td><td>00:00:00</td><td>00:00:00</td><td>0.3</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>528</td><td>1</td><td>csrss</td><td>2025-06-20 21:49:30</td><td>00:00:00</td><td>00:00:00</td><td>0.83</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>3020</td><td>0</td><td>DistributedCacheService</td><td>2025-06-20 21:50:01</td><td>00:01:51</td><td>00:01:53</td><td>113.58</td><td>Microsoft(R) Windows(R) Server AppFabric</td><td>ABC\Administrator</td><td>c:\Program Files\AppFabric 1.1 for Windows Server\DistributedCacheService.exe</td></tr> <tr><td>10308</td><td>1</td><td>dllhost</td><td>2025-06-20 21:52:10</td><td>00:00:00</td><td>00:00:00</td><td>0.02</td><td>COM Surrogate</td><td>ABC\Administrator</td><td>C:\Windows\system32\DllHost.exe</td></tr> <tr><td>388</td><td>1</td><td>dwm</td><td>2025-06-20 21:49:32</td><td>00:00:03</td><td>00:00:04</td><td>4.14</td><td>Desktop Window Manager</td><td>Window Manager\DWM-1</td><td>C:\Windows\system32\dwm.exe</td></tr> <tr><td>6728</td><td>1</td><td>explorer</td><td>2025-06-20 21:50:51</td><td>00:00:01</td><td>00:00:04</td><td>4.14</td><td>Windows Explorer</td><td>ABC\Administrator</td><td>C:\Windows\Explorer.EXE</td></tr> <tr><td>3588</td><td>0</td><td>hostcontrollerservice</td><td>2025-06-20 21:50:01</td><td>00:00:06</td><td>00:00:08</td><td>8.05</td><td>Microsoft&#174; SharePoint&#174; Search Host Controller</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Search\HostController\hostcontrollerservice.exe</td></tr> <tr><td>0</td><td>0</td><td>Idle</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>2144</td><td>0</td><td>inetinfo</td><td>2025-06-20 21:49:36</td><td>00:00:01</td><td>00:00:02</td><td>2.23</td><td>Internet Information Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\inetsrv\inetinfo.exe</td></tr> <tr><td>672</td><td>0</td><td>lsass</td><td>2025-06-20 21:49:31</td><td>00:00:02</td><td>00:00:03</td><td>3.69</td><td>Local Security Authority Process</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\lsass.exe</td></tr> <tr><td>3568</td><td>0</td><td>Microsoft.Office.Project.Server.Calculation</td><td>2025-06-20 21:50:01</td><td>00:00:14</td><td>00:00:16</td><td>16.75</td><td>Microsoft Office Project Server Calculation Service</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\Microsoft.Office.Project.Server.Calculation.exe</td></tr> <tr><td>3580</td><td>0</td><td>Microsoft.Office.Project.Server.Eventing</td><td>2025-06-20 21:50:01</td><td>00:00:13</td><td>00:00:15</td><td>15.28</td><td>Microsoft Office Project Server Event Service</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\Microsoft.Office.Project.Server.Eventing.exe</td></tr> <tr><td>3224</td><td>0</td><td>Microsoft.Office.Project.Server.Queuing</td><td>2025-06-20 21:50:01</td><td>00:00:14</td><td>00:00:16</td><td>16.64</td><td>Microsoft Project Server Queue Service</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\Microsoft.Office.Project.Server.Queuing.exe</td></tr> <tr><td>1800</td><td>0</td><td>MicrosoftEdgeUpdate</td><td>2025-06-20 21:50:39</td><td>00:00:00</td><td>00:00:00</td><td>0.06</td><td>Microsoft Edge Update</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Program Files (x86)\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe</td></tr> <tr><td>6800</td><td>0</td><td>msdtc</td><td>2025-06-20 21:52:04</td><td>00:00:00</td><td>00:00:00</td><td>0.05</td><td>Microsoft Distributed Transaction Coordinator Service</td><td>NT AUTHORITY\NETWORK SERVICE</td><td>C:\Windows\System32\msdtc.exe</td></tr> <tr><td>7312</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:07</td><td>00:00:06</td><td>00:00:09</td><td>9.69</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>7556</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:31</td><td>00:00:00</td><td>00:00:00</td><td>0.09</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>7628</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:10</td><td>00:00:00</td><td>00:00:00</td><td>0.03</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>7868</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:11</td><td>00:00:04</td><td>00:00:06</td><td>6.44</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>7876</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:11</td><td>00:00:01</td><td>00:00:02</td><td>2.62</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>7944</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:11</td><td>00:00:00</td><td>00:00:00</td><td>0.16</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>8084</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:12</td><td>00:00:04</td><td>00:00:04</td><td>4.8</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>8272</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:15</td><td>00:00:07</td><td>00:00:09</td><td>9.06</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>8924</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:21</td><td>00:00:00</td><td>00:00:00</td><td>0.09</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>9000</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:22</td><td>00:00:00</td><td>00:00:00</td><td>0.83</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>9248</td><td>1</td><td>msedge</td><td>2025-06-20 21:51:47</td><td>00:00:00</td><td>00:00:00</td><td>0.16</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>10408</td><td>1</td><td>msedge</td><td>2025-06-20 21:52:11</td><td>00:00:00</td><td>00:00:00</td><td>0.14</td><td>Microsoft Edge</td><td>ABC\Administrator</td><td>C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</td></tr> <tr><td>2400</td><td>0</td><td>MsMpEng</td><td>2025-06-20 21:49:36</td><td>00:00:23</td><td>00:00:25</td><td>25.78</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>6900</td><td>0</td><td>mssearch</td><td>2025-06-20 21:51:40</td><td>00:00:01</td><td>00:00:02</td><td>2.05</td><td>Microsoft&#174; SharePoint&#174; Search Crawler</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\mssearch.exe</td></tr> <tr><td>4316</td><td>0</td><td>noderunner</td><td>2025-06-20 21:50:17</td><td>00:00:33</td><td>00:00:37</td><td>37.3</td><td>Microsoft&#174; SharePoint&#174; Search Component</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Search\Runtime\1.0\NodeRunner.exe</td></tr> <tr><td>5232</td><td>0</td><td>noderunner</td><td>2025-06-20 21:50:19</td><td>00:00:35</td><td>00:00:40</td><td>40</td><td>Microsoft&#174; SharePoint&#174; Search Component</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Search\Runtime\1.0\NodeRunner.exe</td></tr> <tr><td>5260</td><td>0</td><td>noderunner</td><td>2025-06-20 21:50:20</td><td>00:00:36</td><td>00:00:41</td><td>41.02</td><td>Microsoft&#174; SharePoint&#174; Search Component</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Search\Runtime\1.0\NodeRunner.exe</td></tr> <tr><td>5392</td><td>0</td><td>noderunner</td><td>2025-06-20 21:50:20</td><td>00:00:25</td><td>00:00:28</td><td>28.97</td><td>Microsoft&#174; SharePoint&#174; Search Component</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Search\Runtime\1.0\NodeRunner.exe</td></tr> <tr><td>5604</td><td>0</td><td>noderunner</td><td>2025-06-20 21:50:22</td><td>00:00:39</td><td>00:00:44</td><td>44.12</td><td>Microsoft&#174; SharePoint&#174; Search Component</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Search\Runtime\1.0\NodeRunner.exe</td></tr> <tr><td>3592</td><td>0</td><td>OWSTIMER</td><td>2025-06-20 21:50:01</td><td>00:00:18</td><td>00:00:23</td><td>23.03</td><td>SharePoint Timer Service</td><td>ABC\Administrator</td><td>C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\16\BIN\OWSTIMER.EXE</td></tr> <tr><td>10580</td><td>1</td><td>powershell</td><td>2025-06-20 21:52:13</td><td>00:00:02</td><td>00:00:03</td><td>3.33</td><td>Windows PowerShell</td><td>ABC\Administrator</td><td>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</td></tr> <tr><td>6032</td><td>1</td><td>RuntimeBroker</td><td>2025-06-20 21:50:29</td><td>00:00:00</td><td>00:00:00</td><td>0.2</td><td>Runtime Broker</td><td>ABC\Administrator</td><td>C:\Windows\System32\RuntimeBroker.exe</td></tr> <tr><td>5188</td><td>0</td><td>schedengine</td><td>2025-06-20 21:50:31</td><td>00:00:00</td><td>00:00:00</td><td>0.08</td><td>Microsoft Project Scheduling Worker Process</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\schedengine.exe</td></tr> <tr><td>5544</td><td>0</td><td>schedengine</td><td>2025-06-20 21:50:22</td><td>00:00:00</td><td>00:00:00</td><td>0.03</td><td>Microsoft Project Scheduling Worker Process</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\schedengine.exe</td></tr> <tr><td>5836</td><td>0</td><td>schedengine</td><td>2025-06-20 21:50:26</td><td>00:00:00</td><td>00:00:00</td><td>0.06</td><td>Microsoft Project Scheduling Worker Process</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\schedengine.exe</td></tr> <tr><td>5856</td><td>0</td><td>schedengine</td><td>2025-06-20 21:50:26</td><td>00:00:00</td><td>00:00:00</td><td>0.03</td><td>Microsoft Project Scheduling Worker Process</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\schedengine.exe</td></tr> <tr><td>6060</td><td>0</td><td>schedengine</td><td>2025-06-20 21:50:30</td><td>00:00:00</td><td>00:00:00</td><td>0.06</td><td>Microsoft Project Scheduling Worker Process</td><td>ABC\Administrator</td><td>C:\Program Files\Microsoft Office Servers\16.0\Bin\schedengine.exe</td></tr> <tr><td>4980</td><td>1</td><td>SearchUI</td><td>2025-06-20 21:51:06</td><td>00:00:01</td><td>00:00:01</td><td>1.78</td><td>Search and Cortana application</td><td>ABC\Administrator</td><td>C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe</td></tr> <tr><td>6776</td><td>1</td><td>ServerManager</td><td>2025-06-20 21:51:05</td><td>00:00:03</td><td>00:00:03</td><td>3.75</td><td>Server Manager</td><td>ABC\Administrator</td><td>C:\Windows\system32\ServerManager.exe</td></tr> <tr><td>656</td><td>0</td><td>services</td><td>2025-06-20 21:49:31</td><td>00:00:00</td><td>00:00:01</td><td>1.09</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>6824</td><td>1</td><td>ShellExperienceHost</td><td>2025-06-20 21:51:06</td><td>00:00:00</td><td>00:00:00</td><td>0.84</td><td>Windows Shell Experience Host</td><td>ABC\Administrator</td><td>C:\Windows\SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe</td></tr> <tr><td>3148</td><td>1</td><td>sihost</td><td>2025-06-20 21:50:36</td><td>00:00:00</td><td>00:00:00</td><td>0.31</td><td>Shell Infrastructure Host</td><td>ABC\Administrator</td><td>C:\Windows\system32\sihost.exe</td></tr> <tr><td>324</td><td>0</td><td>smss</td><td>2025-06-20 21:49:29</td><td>00:00:00</td><td>00:00:00</td><td>0.19</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>2172</td><td>0</td><td>SMSvcHost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.52</td><td>SMSvcHost.exe</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Windows\Microsoft.NET\Framework64\v4.0.30319\SMSvcHost.exe</td></tr> <tr><td>1440</td><td>0</td><td>spoolsv</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.16</td><td>Spooler SubSystem App</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\System32\spoolsv.exe</td></tr> <tr><td>3612</td><td>0</td><td>sqlceip</td><td>2025-06-20 21:49:49</td><td>00:00:00</td><td>00:00:00</td><td>0.12</td><td>Sql Server Telemetry Client</td><td>NT SERVICE\SQLTELEMETRY</td><td>C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Binn\sqlceip.exe</td></tr> <tr><td>3620</td><td>0</td><td>sqlservr</td><td>2025-06-20 21:49:49</td><td>00:00:22</td><td>00:00:26</td><td>26.62</td><td>SQL Server Windows NT - 64 Bit</td><td>NT SERVICE\MSSQLSERVER</td><td>C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Binn\sqlservr.exe</td></tr> <tr><td>2296</td><td>0</td><td>sqlwriter</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.06</td><td>SQL Server VSS Writer - 64 Bit</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Program Files\Microsoft SQL Server\90\Shared\sqlwriter.exe</td></tr> <tr><td>468</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:32</td><td>00:00:00</td><td>00:00:00</td><td>0.81</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\System32\svchost.exe</td></tr> <tr><td>772</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:32</td><td>00:00:00</td><td>00:00:00</td><td>0.66</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>792</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:33</td><td>00:00:00</td><td>00:00:01</td><td>1.59</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>816</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:33</td><td>00:00:01</td><td>00:00:03</td><td>3.09</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Windows\System32\svchost.exe</td></tr> <tr><td>836</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:32</td><td>00:00:00</td><td>00:00:00</td><td>0.7</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\NETWORK SERVICE</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>968</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:32</td><td>00:00:02</td><td>00:00:04</td><td>4.81</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>980</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:32</td><td>00:00:00</td><td>00:00:00</td><td>0.2</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\NETWORK SERVICE</td><td>C:\Windows\System32\svchost.exe</td></tr> <tr><td>1076</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:33</td><td>00:00:00</td><td>00:00:00</td><td>0.98</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\NETWORK SERVICE</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>1104</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:33</td><td>00:00:00</td><td>00:00:00</td><td>0.12</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>1308</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:35</td><td>00:00:00</td><td>00:00:00</td><td>0.52</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>1492</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.02</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>1532</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.12</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\NETWORK SERVICE</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>2112</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.2</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>2124</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.88</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>2136</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.92</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\System32\svchost.exe</td></tr> <tr><td>2232</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.08</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\System32\svchost.exe</td></tr> <tr><td>2308</td><td>0</td><td>svchost</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.62</td><td>Host Process for Windows Services</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>3244</td><td>1</td><td>svchost</td><td>2025-06-20 21:50:36</td><td>00:00:00</td><td>00:00:00</td><td>0.11</td><td>Host Process for Windows Services</td><td>ABC\Administrator</td><td>C:\Windows\system32\svchost.exe</td></tr> <tr><td>8024</td><td>0</td><td>svchost</td><td>2025-06-20 21:51:11</td><td>00:00:00</td><td>00:00:00</td><td>0.08</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>4</td><td>0</td><td>System</td><td>2025-06-20 21:49:29</td><td>00:00:00</td><td>00:00:07</td><td>7.83</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>1344</td><td>1</td><td>taskhostw</td><td>2025-06-20 21:50:39</td><td>00:00:00</td><td>00:00:00</td><td>0.22</td><td>Host Process for Windows Tasks</td><td>ABC\Administrator</td><td>C:\Windows\system32\taskhostw.exe</td></tr> <tr><td>10460</td><td>0</td><td>TiWorker</td><td>2025-06-20 21:52:42</td><td>00:00:04</td><td>00:00:04</td><td>4.39</td><td>Windows Modules Installer Worker</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\winsxs\amd64_microsoft-windows-servicingstack_31bf3856ad364e35_10.0.14393.1883_none_7ed84bd822106081\TiWorker.exe</td></tr> <tr><td>8516</td><td>0</td><td>TrustedInstaller</td><td>2025-06-20 21:52:42</td><td>00:00:00</td><td>00:00:00</td><td>0.03</td><td>Windows Modules Installer</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\servicing\TrustedInstaller.exe</td></tr> <tr><td>1368</td><td>0</td><td>VSSVC</td><td>2025-06-20 21:49:35</td><td>00:00:00</td><td>00:00:00</td><td>0.02</td><td>Microsoft&#174; Volume Shadow Copy Service</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\vssvc.exe</td></tr> <tr><td>9536</td><td>0</td><td>w3wp</td><td>2025-06-20 21:52:03</td><td>00:00:03</td><td>00:00:03</td><td>3.88</td><td>IIS Worker Process</td><td>ABC\Administrator</td><td>c:\windows\system32\inetsrv\w3wp.exe</td></tr> <tr><td>9984</td><td>0</td><td>w3wp</td><td>2025-06-20 21:51:57</td><td>00:00:04</td><td>00:00:05</td><td>5.31</td><td>IIS Worker Process</td><td>ABC\Administrator</td><td>c:\windows\system32\inetsrv\w3wp.exe</td></tr> <tr><td>520</td><td>0</td><td>wininit</td><td>2025-06-20 21:49:30</td><td>00:00:00</td><td>00:00:00</td><td>0.19</td><td>N/A</td><td>N/A</td><td>N/A</td></tr> <tr><td>584</td><td>1</td><td>winlogon</td><td>2025-06-20 21:49:30</td><td>00:00:00</td><td>00:00:00</td><td>0.27</td><td>Windows Logon Application</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\winlogon.exe</td></tr> <tr><td>1436</td><td>0</td><td>WmiPrvSE</td><td>2025-06-20 21:51:45</td><td>00:00:00</td><td>00:00:00</td><td>0.72</td><td>WMI Provider Host</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\wbem\wmiprvse.exe</td></tr> <tr><td>4216</td><td>0</td><td>WmiPrvSE</td><td>2025-06-20 21:51:04</td><td>00:00:00</td><td>00:00:00</td><td>0.14</td><td>WMI Provider Host</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Windows\system32\wbem\wmiprvse.exe</td></tr> <tr><td>4740</td><td>0</td><td>WmiPrvSE</td><td>2025-06-20 21:50:17</td><td>00:00:01</td><td>00:00:02</td><td>2.17</td><td>WMI Provider Host</td><td>NT AUTHORITY\NETWORK SERVICE</td><td>C:\Windows\system32\wbem\wmiprvse.exe</td></tr> <tr><td>8704</td><td>0</td><td>WmiPrvSE</td><td>2025-06-20 21:51:20</td><td>00:00:00</td><td>00:00:00</td><td>0.09</td><td>WMI Provider Host</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Windows\system32\wbem\wmiprvse.exe</td></tr> <tr><td>2268</td><td>0</td><td>WSSADMIN</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.05</td><td>Microsoft SharePoint Foundation Administration Service</td><td>NT AUTHORITY\SYSTEM</td><td>C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\16\BIN\WSSADMIN.EXE</td></tr> <tr><td>2280</td><td>0</td><td>wsstracing</td><td>2025-06-20 21:49:36</td><td>00:00:00</td><td>00:00:00</td><td>0.55</td><td>Microsoft SharePoint Foundation</td><td>NT AUTHORITY\LOCAL SERVICE</td><td>C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\16\BIN\wsstracing.exe</td></tr> </table></div>
+                        </div>
+                    </div>
+                    
+                    <div id="running-services" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128295;</span> Running Services</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Running Windows Services</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>DisplayName</th><th>Status</th><th>ServiceType</th></tr> <tr><td>AppFabric Caching Service</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Application Host Helper Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>AppX Deployment Service (AppXSVC)</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Base Filtering Engine</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Background Tasks Infrastructure Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Claims to Windows Token Service</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Connected Devices Platform Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>CDPUserSvc_5f0e6</td><td>Running</td><td>224</td></tr> <tr><td>Certificate Propagation</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>CoreMessaging</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Cryptographic Services</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>DCOM Server Process Launcher</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>DHCP Client</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Connected User Experiences and Telemetry</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>DNS Client</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Diagnostic Policy Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Event Log</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>COM+ Event System</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Font Cache Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Group Policy Client</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>IIS Admin Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>IKE and AuthIP IPsec Keying Modules</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>IP Helper</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>CNG Key Isolation</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Server</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Workstation</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>TCP/IP NetBIOS Helper</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Local Session Manager</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Firewall</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Distributed Transaction Coordinator</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>SQL Server (MSSQLSERVER)</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Network Connection Broker</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Netlogon</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Net.Pipe Listener Adapter</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Network List Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Net.Tcp Listener Adapter</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Net.Tcp Port Sharing Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Network Location Awareness</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Network Store Interface Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Sync Host_5f0e6</td><td>Running</td><td>224</td></tr> <tr><td>SharePoint Server Search 16</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Program Compatibility Assistant Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Plug and Play</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>IPsec Policy Agent</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Power</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>User Profile Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Project Server Calculation Service 2016</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Microsoft Project Server Events Service 2016</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Microsoft Project Server Queue Service 2016</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Remote Registry</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>RPC Endpoint Mapper</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Procedure Call (RPC)</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Security Accounts Manager</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Task Scheduler</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>System Event Notification Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Desktop Configuration</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Shell Hardware Detection</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>SharePoint Administration</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Print Spooler</td><td>Running</td><td>Win32OwnProcess, InteractiveProcess</td></tr> <tr><td>SharePoint Search Host Controller</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>SharePoint Timer Service</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>SharePoint Tracing Service</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>SQL Server CEIP service (MSSQLSERVER)</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>SQL Server VSS Writer</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>State Repository Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>System Events Broker</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Desktop Services</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Themes</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Tile Data model server</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Time Broker</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Distributed Link Tracking Client</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Modules Installer</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>User Access Logging Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Desktop Services UserMode Port Redirector</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>User Manager</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Credential Manager</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V Heartbeat Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V Data Exchange Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V Remote Desktop Virtualization Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V Guest Shutdown Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V Time Synchronization Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V Volume Shadow Copy Requestor</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Volume Shadow Copy</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Windows Time</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>World Wide Web Publishing Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Process Activation Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Connection Manager</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>Windows Defender Service</td><td>Running</td><td>Win32OwnProcess</td></tr> <tr><td>WinHTTP Web Proxy Auto-Discovery Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Management Instrumentation</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Remote Management (WS-Management)</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Account Sign-in Assistant</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Push Notifications System Service</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Update</td><td>Running</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Driver Foundation - User-mode Driver Framework</td><td>Running</td><td>Win32ShareProcess</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="stopped-services" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#10060;</span> Stopped Services</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Stopped Windows Services</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>DisplayName</th><th>Status</th><th>ServiceType</th></tr> <tr><td>AllJoyn Router Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Application Layer Gateway Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Application Identity</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Application Information</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Application Management</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>App Readiness</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft App-V Client</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>ASP.NET State Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Windows Audio Endpoint Builder</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Audio</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>ActiveX Installer (AxInstSV)</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Background Intelligent Transfer Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Computer Browser</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Bluetooth Support Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Client License Service (ClipSVC)</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>COM+ System Application</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Offline Files</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Document Conversions Launcher for Microsoft SharePoint Server 2016</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Document Conversions Load Balancer for Microsoft SharePoint Server 2016</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>DataCollectionPublishingService</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Optimize drives</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Device Association Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Device Install Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>DevQuery Background Discovery Broker</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft (R) Diagnostics Hub Standard Collector Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Device Management Enrollment Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>dmwappushsvc</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Wired AutoConfig</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Device Setup Manager</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Data Sharing Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Extensible Authentication Protocol</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Edge Update Service (edgeupdate)</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Microsoft Edge Update Service (edgeupdatem)</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Encrypting File System (EFS)</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Embedded Mode</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Enterprise App Management Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Function Discovery Provider Host</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Function Discovery Resource Publication</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Presentation Foundation Font Cache 3.0.0.0</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Windows Camera Frame Server</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Human Interface Device Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>HV Host Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Mobile Hotspot Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>KDC Proxy Server service (KPS)</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>KtmRm for Distributed Transaction Coordinator</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Geolocation Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows License Manager Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Link-Layer Topology Discovery Mapper</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Downloaded Maps Manager</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Microsoft Edge Elevation Service (MicrosoftEdgeElevationService)</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Microsoft iSCSI Initiator Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Installer</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Network Connectivity Assistant</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Network Connections</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Net.Msmq Listener Adapter</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Network Setup Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Passport Container</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Passport</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Performance Counter DLL Host</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Phone Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Contact Data_5f0e6</td><td>Stopped</td><td>224</td></tr> <tr><td>Performance Logs &amp; Alerts</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Printer Extensions and Notifications</td><td>Stopped</td><td>Win32ShareProcess, InteractiveProcess</td></tr> <tr><td>Quality Windows Audio Video Experience</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Access Auto Connection Manager</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Access Connection Manager</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Routing and Remote Access</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Radio Management Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Remote Procedure Call (RPC) Locator</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Resultant Set of Policy Provider</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Special Administration Console Helper</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Smart Card</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Smart Card Device Enumeration Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Smart Card Removal Policy</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Secondary Logon</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Sensor Data Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Sensor Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Sensor Monitoring Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Internet Connection Sharing (ICS)</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Storage Spaces SMP</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SNMP Trap</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SharePoint Insights</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Software Protection</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SharePoint User Code Host</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SharePoint VSS Writer</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SQL Server Browser</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SQL Server Agent (MSSQLSERVER)</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>SSDP Discovery</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Secure Socket Tunneling Protocol Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Image Acquisition (WIA)</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Storage Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Spot Verifier</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Microsoft Software Shadow Copy Provider</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Superfetch</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Touch Keyboard and Handwriting Panel Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Telephony</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Storage Tiers Management</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Auto Time Zone Updater</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>User Experience Virtualization Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Interactive Services Detection</td><td>Stopped</td><td>Win32OwnProcess, InteractiveProcess</td></tr> <tr><td>User Data Storage_5f0e6</td><td>Stopped</td><td>224</td></tr> <tr><td>UPnP Device Host</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>User Data Access_5f0e6</td><td>Stopped</td><td>224</td></tr> <tr><td>Update Orchestrator Service for Windows Update</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Virtual Disk</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Hyper-V Guest Service Interface</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Hyper-V PowerShell Direct Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>W3C Logging Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>WalletService</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Biometric Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Diagnostic Service Host</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Diagnostic System Host</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Defender Network Inspection Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Windows Event Collector</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Encryption Provider Host Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Problem Reports and Solutions Control Panel Support</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Error Reporting Service</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Still Image Acquisition Events</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Insider Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>WMI Performance Adapter</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Portable Device Enumerator Service</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Windows Push Notifications User Service_5f0e6</td><td>Stopped</td><td>224</td></tr> <tr><td>Windows Search</td><td>Stopped</td><td>Win32OwnProcess</td></tr> <tr><td>Xbox Live Auth Manager</td><td>Stopped</td><td>Win32ShareProcess</td></tr> <tr><td>Xbox Live Game Save</td><td>Stopped</td><td>Win32ShareProcess</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="features" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9881;</span> Windows Features</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <div class='table-container'><h2>Windows Features Installed</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>Name</th><th>Feature Display Name</th><th>Feature Path</th><th>Installation State</th><th>Feature Type</th></tr> <tr><td>FileAndStorage-Services</td><td>File and Storage Services</td><td>File and Storage Services</td><td>Installed</td><td>Role</td></tr> <tr><td>File-Services</td><td>File and iSCSI Services</td><td>File and Storage Services\File and iSCSI Services</td><td>Installed</td><td>Role Service</td></tr> <tr><td>FS-FileServer</td><td>File Server</td><td>File and Storage Services\File and iSCSI Services\File Server</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Storage-Services</td><td>Storage Services</td><td>File and Storage Services\Storage Services</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Server</td><td>Web Server (IIS)</td><td>Web Server (IIS)</td><td>Installed</td><td>Role</td></tr> <tr><td>Web-WebServer</td><td>Web Server</td><td>Web Server (IIS)\Web Server</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Common-Http</td><td>Common HTTP Features</td><td>Web Server (IIS)\Web Server\Common HTTP Features</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Default-Doc</td><td>Default Document</td><td>Web Server (IIS)\Web Server\Common HTTP Features\Default Document</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Dir-Browsing</td><td>Directory Browsing</td><td>Web Server (IIS)\Web Server\Common HTTP Features\Directory Browsing</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Http-Errors</td><td>HTTP Errors</td><td>Web Server (IIS)\Web Server\Common HTTP Features\HTTP Errors</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Static-Content</td><td>Static Content</td><td>Web Server (IIS)\Web Server\Common HTTP Features\Static Content</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Health</td><td>Health and Diagnostics</td><td>Web Server (IIS)\Web Server\Health and Diagnostics</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Http-Logging</td><td>HTTP Logging</td><td>Web Server (IIS)\Web Server\Health and Diagnostics\HTTP Logging</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Log-Libraries</td><td>Logging Tools</td><td>Web Server (IIS)\Web Server\Health and Diagnostics\Logging Tools</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Request-Monitor</td><td>Request Monitor</td><td>Web Server (IIS)\Web Server\Health and Diagnostics\Request Monitor</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Http-Tracing</td><td>Tracing</td><td>Web Server (IIS)\Web Server\Health and Diagnostics\Tracing</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Performance</td><td>Performance</td><td>Web Server (IIS)\Web Server\Performance</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Stat-Compression</td><td>Static Content Compression</td><td>Web Server (IIS)\Web Server\Performance\Static Content Compression</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Dyn-Compression</td><td>Dynamic Content Compression</td><td>Web Server (IIS)\Web Server\Performance\Dynamic Content Compression</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Security</td><td>Security</td><td>Web Server (IIS)\Web Server\Security</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Filtering</td><td>Request Filtering</td><td>Web Server (IIS)\Web Server\Security\Request Filtering</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Basic-Auth</td><td>Basic Authentication</td><td>Web Server (IIS)\Web Server\Security\Basic Authentication</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Digest-Auth</td><td>Digest Authentication</td><td>Web Server (IIS)\Web Server\Security\Digest Authentication</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Windows-Auth</td><td>Windows Authentication</td><td>Web Server (IIS)\Web Server\Security\Windows Authentication</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-App-Dev</td><td>Application Development</td><td>Web Server (IIS)\Web Server\Application Development</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Net-Ext</td><td>.NET Extensibility 3.5</td><td>Web Server (IIS)\Web Server\Application Development\.NET Extensibility 3.5</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Net-Ext45</td><td>.NET Extensibility 4.6</td><td>Web Server (IIS)\Web Server\Application Development\.NET Extensibility 4.6</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Asp-Net</td><td>ASP.NET 3.5</td><td>Web Server (IIS)\Web Server\Application Development\ASP.NET 3.5</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Asp-Net45</td><td>ASP.NET 4.6</td><td>Web Server (IIS)\Web Server\Application Development\ASP.NET 4.6</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-ISAPI-Ext</td><td>ISAPI Extensions</td><td>Web Server (IIS)\Web Server\Application Development\ISAPI Extensions</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-ISAPI-Filter</td><td>ISAPI Filters</td><td>Web Server (IIS)\Web Server\Application Development\ISAPI Filters</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Mgmt-Tools</td><td>Management Tools</td><td>Web Server (IIS)\Management Tools</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Mgmt-Console</td><td>IIS Management Console</td><td>Web Server (IIS)\Management Tools\IIS Management Console</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Mgmt-Compat</td><td>IIS 6 Management Compatibility</td><td>Web Server (IIS)\Management Tools\IIS 6 Management Compatibility</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Metabase</td><td>IIS 6 Metabase Compatibility</td><td>Web Server (IIS)\Management Tools\IIS 6 Management Compatibility\IIS 6 Metabase Compatibility</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-Lgcy-Scripting</td><td>IIS 6 Scripting Tools</td><td>Web Server (IIS)\Management Tools\IIS 6 Management Compatibility\IIS 6 Scripting Tools</td><td>Installed</td><td>Role Service</td></tr> <tr><td>Web-WMI</td><td>IIS 6 WMI Compatibility</td><td>Web Server (IIS)\Management Tools\IIS 6 Management Compatibility\IIS 6 WMI Compatibility</td><td>Installed</td><td>Role Service</td></tr> <tr><td>NET-Framework-Features</td><td>.NET Framework 3.5 Features</td><td>.NET Framework 3.5 Features</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-Framework-Core</td><td>.NET Framework 3.5 (includes .NET 2.0 and 3.0)</td><td>.NET Framework 3.5 Features\.NET Framework 3.5 (includes .NET 2.0 and 3.0)</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-HTTP-Activation</td><td>HTTP Activation</td><td>.NET Framework 3.5 Features\HTTP Activation</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-Non-HTTP-Activ</td><td>Non-HTTP Activation</td><td>.NET Framework 3.5 Features\Non-HTTP Activation</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-Framework-45-Features</td><td>.NET Framework 4.6 Features</td><td>.NET Framework 4.6 Features</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-Framework-45-Core</td><td>.NET Framework 4.6</td><td>.NET Framework 4.6 Features\.NET Framework 4.6</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-Framework-45-ASPNET</td><td>ASP.NET 4.6</td><td>.NET Framework 4.6 Features\ASP.NET 4.6</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-WCF-Services45</td><td>WCF Services</td><td>.NET Framework 4.6 Features\WCF Services</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-WCF-HTTP-Activation45</td><td>HTTP Activation</td><td>.NET Framework 4.6 Features\WCF Services\HTTP Activation</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-WCF-Pipe-Activation45</td><td>Named Pipe Activation</td><td>.NET Framework 4.6 Features\WCF Services\Named Pipe Activation</td><td>Installed</td><td>Feature</td></tr> <tr><td>NET-WCF-TCP-PortSharing45</td><td>TCP Port Sharing</td><td>.NET Framework 4.6 Features\WCF Services\TCP Port Sharing</td><td>Installed</td><td>Feature</td></tr> <tr><td>FS-SMB1</td><td>SMB 1.0/CIFS File Sharing Support</td><td>SMB 1.0/CIFS File Sharing Support</td><td>Installed</td><td>Feature</td></tr> <tr><td>Windows-Defender-Features</td><td>Windows Defender Features</td><td>Windows Defender Features</td><td>Installed</td><td>Feature</td></tr> <tr><td>Windows-Defender</td><td>Windows Defender</td><td>Windows Defender Features\Windows Defender</td><td>Installed</td><td>Feature</td></tr> <tr><td>Windows-Defender-Gui</td><td>GUI for Windows Defender</td><td>Windows Defender Features\GUI for Windows Defender</td><td>Installed</td><td>Feature</td></tr> <tr><td>Windows-Identity-Foundation</td><td>Windows Identity Foundation 3.5</td><td>Windows Identity Foundation 3.5</td><td>Installed</td><td>Feature</td></tr> <tr><td>PowerShellRoot</td><td>Windows PowerShell</td><td>Windows PowerShell</td><td>Installed</td><td>Feature</td></tr> <tr><td>PowerShell</td><td>Windows PowerShell 5.1</td><td>Windows PowerShell\Windows PowerShell 5.1</td><td>Installed</td><td>Feature</td></tr> <tr><td>PowerShell-V2</td><td>Windows PowerShell 2.0 Engine</td><td>Windows PowerShell\Windows PowerShell 2.0 Engine</td><td>Installed</td><td>Feature</td></tr> <tr><td>PowerShell-ISE</td><td>Windows PowerShell ISE</td><td>Windows PowerShell\Windows PowerShell ISE</td><td>Installed</td><td>Feature</td></tr> <tr><td>WAS</td><td>Windows Process Activation Service</td><td>Windows Process Activation Service</td><td>Installed</td><td>Feature</td></tr> <tr><td>WAS-Process-Model</td><td>Process Model</td><td>Windows Process Activation Service\Process Model</td><td>Installed</td><td>Feature</td></tr> <tr><td>WAS-NET-Environment</td><td>.NET Environment 3.5</td><td>Windows Process Activation Service\.NET Environment 3.5</td><td>Installed</td><td>Feature</td></tr> <tr><td>WAS-Config-APIs</td><td>Configuration APIs</td><td>Windows Process Activation Service\Configuration APIs</td><td>Installed</td><td>Feature</td></tr> <tr><td>WoW64-Support</td><td>WoW64 Support</td><td>WoW64 Support</td><td>Installed</td><td>Feature</td></tr> <tr><td>XPS-Viewer</td><td>XPS Viewer</td><td>XPS Viewer</td><td>Installed</td><td>Feature</td></tr> </table></div>
+                        </div>
+                    </div>
+                </div>
+            </div>            
+            <!-- Network Information Section -->
+            <div id="network-info" class="section">
+                <div class="section-header">
+                    <h2><span class="icon-emoji">&#127760;</span> Network Information</h2>
+                </div>
+                <div class="section-content">
+                    <div id="network-interfaces" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#127760;</span> Network Interfaces</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>NIC Details</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Interface Name</th><th>Description</th><th>Network Profile</th><th>Status</th><th>IPv4Address</th><th>IPv6Address</th><th>DNS Server</th><th>IPv6 Interface</th><th>IPv4 Interface</th><th>MAC</th><th>Speed</th></tr> <tr><td>Ethernet</td><td>Microsoft Hyper-V Network Adapter</td><td>abc.local</td><td>Up</td><td>192.168.1.170</td><td></td><td>192.168.1.160</td><td>Enabled</td><td>Disabled</td><td>00-15-5D-01-32-33</td><td>585 Mbps</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="traffic" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128202;</span> Traffic Information</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Current Traffic Details</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>NIC</th><th>Received(MB/s)</th><th>Sent(MB/s)</th></tr> <tr><td>microsoft hyper-v network adapter</td><td>0</td><td>0</td></tr> <tr><td>microsoft hyper-v network adapter</td><td>0</td><td>0</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="open-ports" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128268;</span> Open Ports</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <div class='table-container'><h2>TCP Ports Opened</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Source IP Address</th><th>Source Port</th><th>Destination IP Address</th><th>Destination Port</th><th>Connection State</th><th>Owning Process ID</th></tr> <tr><td>::</td><td>50075</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>50074</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>50073</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>50072</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>50053</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>50020</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>50004</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>49970</td><td>::</td><td>N/A</td><td>Bound</td><td>5232</td></tr> <tr><td>::</td><td>49967</td><td>::</td><td>N/A</td><td>Bound</td><td>5260</td></tr> <tr><td>::</td><td>49958</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>49915</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>49904</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>49891</td><td>::</td><td>N/A</td><td>Bound</td><td>3592</td></tr> <tr><td>::</td><td>49882</td><td>::</td><td>N/A</td><td>Bound</td><td>5604</td></tr> <tr><td>::</td><td>49861</td><td>::</td><td>N/A</td><td>Bound</td><td>3588</td></tr> <tr><td>::</td><td>49858</td><td>::</td><td>N/A</td><td>Bound</td><td>4316</td></tr> <tr><td>::</td><td>49851</td><td>::</td><td>N/A</td><td>Bound</td><td>5392</td></tr> <tr><td>::</td><td>49825</td><td>::</td><td>N/A</td><td>Bound</td><td>3588</td></tr> <tr><td>::</td><td>49820</td><td>::</td><td>N/A</td><td>Bound</td><td>3588</td></tr> <tr><td>::</td><td>49814</td><td>::</td><td>N/A</td><td>Bound</td><td>3588</td></tr> <tr><td>::</td><td>49796</td><td>::</td><td>N/A</td><td>Bound</td><td>3588</td></tr> <tr><td>::</td><td>49682</td><td>::</td><td>N/A</td><td>Bound</td><td>3568</td></tr> <tr><td>::</td><td>49681</td><td>::</td><td>N/A</td><td>Bound</td><td>3568</td></tr> <tr><td>::</td><td>49680</td><td>::</td><td>N/A</td><td>Bound</td><td>3568</td></tr> <tr><td>::</td><td>49679</td><td>::</td><td>N/A</td><td>Bound</td><td>3568</td></tr> <tr><td>::</td><td>49678</td><td>::</td><td>N/A</td><td>Bound</td><td>3568</td></tr> <tr><td>::</td><td>49672</td><td>::</td><td>N/A</td><td>Bound</td><td>3020</td></tr> <tr><td>::</td><td>64702</td><td>::</td><td>N/A</td><td>Listen</td><td>5188</td></tr> <tr><td>::</td><td>64524</td><td>::</td><td>N/A</td><td>Listen</td><td>6060</td></tr> <tr><td>::</td><td>64186</td><td>::</td><td>N/A</td><td>Listen</td><td>5544</td></tr> <tr><td>::</td><td>57930</td><td>::</td><td>N/A</td><td>Listen</td><td>5856</td></tr> <tr><td>::</td><td>50284</td><td>::</td><td>N/A</td><td>Listen</td><td>5836</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50075</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50074</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50073</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50072</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>Established</td><td>3592</td></tr> <tr><td>::1</td><td>50070</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50069</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50068</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50067</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50066</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50065</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50064</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50063</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50062</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50061</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50060</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50059</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50058</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50057</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50056</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50053</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50020</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50004</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>3592</td></tr> <tr><td>::1</td><td>50003</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50002</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>::1</td><td>50001</td><td>::1</td><td>5985</td><td>TimeWait</td><td>0</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49970</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>5232</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49967</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>5260</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49958</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49915</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>3592</td></tr> <tr><td>::1</td><td>49904</td><td>::1</td><td>32843</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49891</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>3592</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49882</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>5604</td></tr> <tr><td>::1</td><td>49861</td><td>::1</td><td>808</td><td>Established</td><td>3588</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49858</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>4316</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49851</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>Established</td><td>5392</td></tr> <tr><td>::1</td><td>49825</td><td>::1</td><td>808</td><td>Established</td><td>3588</td></tr> <tr><td>::1</td><td>49820</td><td>::1</td><td>808</td><td>Established</td><td>3588</td></tr> <tr><td>::1</td><td>49814</td><td>::1</td><td>808</td><td>Established</td><td>3588</td></tr> <tr><td>::1</td><td>49796</td><td>::1</td><td>808</td><td>Established</td><td>3588</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49672</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22234</td><td>Established</td><td>3020</td></tr> <tr><td>::</td><td>49671</td><td>::</td><td>N/A</td><td>Listen</td><td>656</td></tr> <tr><td>::</td><td>49670</td><td>::</td><td>N/A</td><td>Listen</td><td>672</td></tr> <tr><td>::</td><td>49669</td><td>::</td><td>N/A</td><td>Listen</td><td>1532</td></tr> <tr><td>::</td><td>49668</td><td>::</td><td>N/A</td><td>Listen</td><td>1440</td></tr> <tr><td>::</td><td>49667</td><td>::</td><td>N/A</td><td>Listen</td><td>672</td></tr> <tr><td>::</td><td>49666</td><td>::</td><td>N/A</td><td>Listen</td><td>968</td></tr> <tr><td>::</td><td>49665</td><td>::</td><td>N/A</td><td>Listen</td><td>816</td></tr> <tr><td>::</td><td>49664</td><td>::</td><td>N/A</td><td>Listen</td><td>520</td></tr> <tr><td>::</td><td>47001</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>::</td><td>39719</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>::</td><td>32844</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>::1</td><td>32843</td><td>::1</td><td>49904</td><td>Established</td><td>4</td></tr> <tr><td>::</td><td>32843</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>::</td><td>22236</td><td>::</td><td>N/A</td><td>Listen</td><td>3020</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22234</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49672</td><td>Established</td><td>3020</td></tr> <tr><td>::</td><td>22234</td><td>::</td><td>N/A</td><td>Listen</td><td>3020</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50075</td><td>Established</td><td>3020</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50074</td><td>Established</td><td>3020</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50073</td><td>Established</td><td>3020</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>22233</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50072</td><td>Established</td><td>3020</td></tr> <tr><td>::</td><td>22233</td><td>::</td><td>N/A</td><td>Listen</td><td>3020</td></tr> <tr><td>::</td><td>16500</td><td>::</td><td>N/A</td><td>Listen</td><td>5392</td></tr> <tr><td>::</td><td>16003</td><td>::</td><td>N/A</td><td>Listen</td><td>3580</td></tr> <tr><td>::</td><td>16002</td><td>::</td><td>N/A</td><td>Listen</td><td>3224</td></tr> <tr><td>::</td><td>16001</td><td>::</td><td>N/A</td><td>Listen</td><td>3568</td></tr> <tr><td>::</td><td>5985</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>::1</td><td>1434</td><td>::</td><td>N/A</td><td>Listen</td><td>3620</td></tr> <tr><td>::</td><td>1433</td><td>::</td><td>N/A</td><td>Listen</td><td>3620</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50053</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50020</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>50004</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49970</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49967</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49958</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49915</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49891</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49882</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49858</td><td>Established</td><td>2172</td></tr> <tr><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>808</td><td>fe80::a934:5bfb:b0bc:ab87%2</td><td>49851</td><td>Established</td><td>2172</td></tr> <tr><td>::1</td><td>808</td><td>::1</td><td>49861</td><td>Established</td><td>2172</td></tr> <tr><td>::1</td><td>808</td><td>::1</td><td>49825</td><td>Established</td><td>2172</td></tr> <tr><td>::1</td><td>808</td><td>::1</td><td>49820</td><td>Established</td><td>2172</td></tr> <tr><td>::1</td><td>808</td><td>::1</td><td>49814</td><td>Established</td><td>2172</td></tr> <tr><td>::1</td><td>808</td><td>::1</td><td>49796</td><td>Established</td><td>2172</td></tr> <tr><td>::</td><td>808</td><td>::</td><td>N/A</td><td>Listen</td><td>2172</td></tr> <tr><td>::</td><td>445</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>::</td><td>135</td><td>::</td><td>N/A</td><td>Listen</td><td>836</td></tr> <tr><td>::</td><td>80</td><td>::</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>0.0.0.0</td><td>50079</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>2136</td></tr> <tr><td>0.0.0.0</td><td>50077</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>2136</td></tr> <tr><td>0.0.0.0</td><td>50071</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>6872</td></tr> <tr><td>0.0.0.0</td><td>49999</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49984</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49983</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49982</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49956</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>968</td></tr> <tr><td>0.0.0.0</td><td>49886</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49871</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>6728</td></tr> <tr><td>0.0.0.0</td><td>49870</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49865</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>968</td></tr> <tr><td>0.0.0.0</td><td>49864</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49845</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49836</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49831</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49828</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49808</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49807</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49801</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>968</td></tr> <tr><td>0.0.0.0</td><td>49799</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>968</td></tr> <tr><td>0.0.0.0</td><td>49779</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49778</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49769</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49768</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49761</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49760</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49759</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49758</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>7876</td></tr> <tr><td>0.0.0.0</td><td>49751</td><td>0.0.0.0</td><td>N/A</td><td>Bound</td><td>672</td></tr> <tr><td>192.168.1.170</td><td>50079</td><td>51.105.71.137</td><td>443</td><td>Established</td><td>2136</td></tr> <tr><td>192.168.1.170</td><td>50078</td><td>146.75.118.172</td><td>80</td><td>TimeWait</td><td>0</td></tr> <tr><td>192.168.1.170</td><td>50077</td><td>51.105.71.137</td><td>443</td><td>Established</td><td>2136</td></tr> <tr><td>192.168.1.170</td><td>50076</td><td>128.85.113.135</td><td>443</td><td>TimeWait</td><td>0</td></tr> <tr><td>192.168.1.170</td><td>50071</td><td>4.208.165.242</td><td>443</td><td>Established</td><td>6872</td></tr> <tr><td>192.168.1.170</td><td>49999</td><td>213.139.57.34</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49985</td><td>192.168.1.160</td><td>49675</td><td>TimeWait</td><td>0</td></tr> <tr><td>192.168.1.170</td><td>49984</td><td>104.208.16.95</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49983</td><td>150.171.27.11</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49982</td><td>13.107.246.60</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49957</td><td>52.167.249.196</td><td>443</td><td>TimeWait</td><td>0</td></tr> <tr><td>192.168.1.170</td><td>49956</td><td>98.66.133.184</td><td>443</td><td>Established</td><td>968</td></tr> <tr><td>192.168.1.170</td><td>49886</td><td>204.79.197.203</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49878</td><td>23.193.110.2</td><td>80</td><td>TimeWait</td><td>0</td></tr> <tr><td>192.168.1.170</td><td>49872</td><td>23.193.110.2</td><td>80</td><td>TimeWait</td><td>0</td></tr> <tr><td>192.168.1.170</td><td>49871</td><td>98.66.133.184</td><td>443</td><td>Established</td><td>6728</td></tr> <tr><td>192.168.1.170</td><td>49870</td><td>4.231.66.184</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49865</td><td>20.190.181.1</td><td>443</td><td>Established</td><td>968</td></tr> <tr><td>192.168.1.170</td><td>49864</td><td>185.199.108.133</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49845</td><td>150.171.28.10</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49836</td><td>150.171.28.11</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49831</td><td>140.82.113.21</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49828</td><td>204.79.197.203</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49808</td><td>52.182.143.214</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49807</td><td>52.182.143.214</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49801</td><td>192.168.1.160</td><td>49667</td><td>Established</td><td>968</td></tr> <tr><td>192.168.1.170</td><td>49799</td><td>192.168.1.160</td><td>135</td><td>Established</td><td>968</td></tr> <tr><td>192.168.1.170</td><td>49779</td><td>172.211.159.152</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49778</td><td>185.199.111.154</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49769</td><td>185.199.108.133</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49768</td><td>185.199.111.154</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49760</td><td>18.244.18.27</td><td>443</td><td>Established</td><td>7876</td></tr> <tr><td>192.168.1.170</td><td>49751</td><td>192.168.1.160</td><td>49667</td><td>Established</td><td>672</td></tr> <tr><td>192.168.1.170</td><td>49750</td><td>192.168.1.160</td><td>135</td><td>TimeWait</td><td>0</td></tr> <tr><td>0.0.0.0</td><td>49671</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>656</td></tr> <tr><td>0.0.0.0</td><td>49670</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>672</td></tr> <tr><td>0.0.0.0</td><td>49669</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>1532</td></tr> <tr><td>0.0.0.0</td><td>49668</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>1440</td></tr> <tr><td>0.0.0.0</td><td>49667</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>672</td></tr> <tr><td>0.0.0.0</td><td>49666</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>968</td></tr> <tr><td>0.0.0.0</td><td>49665</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>816</td></tr> <tr><td>0.0.0.0</td><td>49664</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>520</td></tr> <tr><td>0.0.0.0</td><td>22236</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3020</td></tr> <tr><td>0.0.0.0</td><td>22234</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3020</td></tr> <tr><td>0.0.0.0</td><td>22233</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3020</td></tr> <tr><td>0.0.0.0</td><td>16003</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3580</td></tr> <tr><td>0.0.0.0</td><td>16002</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3224</td></tr> <tr><td>0.0.0.0</td><td>16001</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3568</td></tr> <tr><td>127.0.0.1</td><td>1434</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3620</td></tr> <tr><td>0.0.0.0</td><td>1433</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>3620</td></tr> <tr><td>0.0.0.0</td><td>808</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>2172</td></tr> <tr><td>192.168.1.170</td><td>139</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>4</td></tr> <tr><td>0.0.0.0</td><td>135</td><td>0.0.0.0</td><td>N/A</td><td>Listen</td><td>836</td></tr> </table></div>
+                        </div>
+                    </div>
+                </div>
+            </div>            
+            <!-- Security Information Section -->
+            <div id="security-info" class="section">
+                <div class="section-header">
+                    <h2><span class="icon-emoji">&#128737;</span> Security Information</h2>
+                </div>
+                <div class="section-content">
+                    <div id="smbv1" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9888;</span> SMBv1 Status</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>SMB V1 Status</h2> <table> <colgroup><col/><col/><col/><col/></colgroup> <tr><th>FeatureName</th><th>DisplayName</th><th>State</th><th>RestartRequired</th></tr> <tr><td>SMB1Protocol</td><td>SMB 1.0/CIFS File Sharing Support</td><td>Enabled</td><td>Possible</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="password-policy" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128273;</span> Password Policy</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Password Policy Details</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Minimum Password Age</th><th>Maximum Password Age</th><th>Password Length</th><th>Password History</th><th>Lockout Threshold</th><th>Lockout Duration</th><th>Lockout Observation Window</th><th>Force Logoff</th></tr> <tr><td>0</td><td>Unlimited</td><td>0</td><td>None</td><td>Never</td><td>30</td><td>30</td><td>Never</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="inactive-accounts" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128100;</span> Inactive Accounts</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Inactive Accounts (no login in last 365 days)</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Name</th><th>Enabled</th><th>LastLogon</th></tr> <tr><td>DefaultAccount</td><td>False</td><td></td></tr> <tr><td>Guest</td><td>False</td><td></td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="local-admins" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128101;</span> Local Administrators</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Local Admin Accounts</h2> <table> <colgroup><col/><col/></colgroup> <tr><th>Name</th><th>SID</th></tr> <tr><td>ABC\Domain Admins</td><td>S-1-5-21-713149848-667772581-2313636665-512</td></tr> <tr><td>SP1\Administrator</td><td>S-1-5-21-4023471620-4026018457-1731487540-500</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="tls-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128274;</span> TLS Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>TLS 1.2 Settings</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Path</th><th>Name</th><th>Value</th></tr> <tr><td>HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319</td><td>SystemDefaultTlsVersions</td><td>Not Found</td></tr> <tr><td>HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319</td><td>SchUseStrongCrypto</td><td>1</td></tr> <tr><td>HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319</td><td>SystemDefaultTlsVersions</td><td>Not Found</td></tr> <tr><td>HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319</td><td>SchUseStrongCrypto</td><td>1</td></tr> <tr><td>HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server</td><td>Enabled</td><td>Not Found</td></tr> <tr><td>HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server</td><td>DisabledByDefault</td><td>Not Found</td></tr> <tr><td>HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client</td><td>Enabled</td><td>Not Found</td></tr> <tr><td>HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client</td><td>DisabledByDefault</td><td>Not Found</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="uac" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128737;</span> UAC Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>User Account Control (UAC) Settings</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>Enable LUA</th><th>Consent Prompt Behavior Admin</th><th>Prompt On Secure Desktop</th><th>Filter Administrator Token</th><th>Security Status</th></tr> <tr><td>Enabled</td><td>Prompt for consent for non-Windows binaries (Default)</td><td>Enabled (Default)</td><td>Disabled (Default)</td><td>Secure</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="antivirus" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128737;</span> Antivirus Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Anti-Virus Settings</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>AV Enabled</th><th>Real Time Protection</th><th>Behavior Monitor</th><th>Anti Spyware Enabled</th><th>Ioav Protection Enabled</th><th>AV Signature Last Updates</th><th>Anti Spyware Signature Last Updates</th><th>Full Scan Start Time</th><th>Full Scan End Time</th><th>Quick Scan Start Time</th><th>Quick Scan End Time</th></tr> <tr><td>True</td><td>True</td><td>True</td><td>True</td><td>True</td><td>6/20/2025 12:31:36 PM</td><td>6/20/2025 12:31:36 PM</td><td></td><td></td><td>6/20/2025 7:10:05 PM</td><td>6/20/2025 7:16:20 PM</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="firewall-status" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128293;</span> Firewall Status</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Firewall Status</h2> <table> <colgroup><col/><col/></colgroup> <tr><th>Name</th><th>Enabled</th></tr> <tr><td>Domain</td><td>False</td></tr> <tr><td>Private</td><td>False</td></tr> <tr><td>Public</td><td>False</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="firewall-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9881;</span> Firewall Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Firewall Settings</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>DisplayName</th><th>Description</th><th>Direction</th><th>Action</th><th>Profile</th></tr> <tr><td>Connected User Experiences and Telemetry</td><td>Unified Telemetry Client Outbound Traffic</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>AllJoyn Router (TCP-In)</td><td>Inbound rule for AllJoyn Router traffic [TCP]</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>AllJoyn Router (TCP-Out)</td><td>Outbound rule for AllJoyn Router traffic [TCP]</td><td>Outbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>AllJoyn Router (UDP-In)</td><td>Inbound rule for AllJoyn Router traffic [UDP]</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>AllJoyn Router (UDP-Out)</td><td>Outbound rule for AllJoyn Router traffic [UDP]</td><td>Outbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Windows Remote Management (HTTP-In)</td><td>Inbound rule for Windows Remote Management via WS-Management. [TCP 5985]</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Windows Remote Management (HTTP-In)</td><td>Inbound rule for Windows Remote Management via WS-Management. [TCP 5985]</td><td>Inbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Core Networking - Destination Unreachable (ICMPv6-In)</td><td>Destination Unreachable error messages are sent from any node that a packet traverses which is unable to forward the packet for any reason except congestion.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Packet Too Big (ICMPv6-In)</td><td>Packet Too Big error messages are sent from any node that a packet traverses which is unable to forward the packet because the packet is too large for the next link.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Packet Too Big (ICMPv6-Out)</td><td>Packet Too Big error messages are sent from any node that a packet traverses which is unable to forward the packet because the packet is too large for the next link.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Time Exceeded (ICMPv6-In)</td><td>Time Exceeded error messages are generated from any node that a packet traverses if the Hop Limit value is decremented to zero at any point on the path.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Time Exceeded (ICMPv6-Out)</td><td>Time Exceeded error messages are generated from any node that a packet traverses if the Hop Limit value is decremented to zero at any point on the path.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Parameter Problem (ICMPv6-In)</td><td>Parameter Problem error messages are sent by nodes as a result of incorrectly generated packets.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Parameter Problem (ICMPv6-Out)</td><td>Parameter Problem error messages are sent by nodes as a result of incorrectly generated packets.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Neighbor Discovery Solicitation (ICMPv6-In)</td><td>Neighbor Discovery Solicitations are sent by nodes to discover the link-layer address of another on-link IPv6 node.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Neighbor Discovery Solicitation (ICMPv6-Out)</td><td>Neighbor Discovery Solicitations are sent by nodes to discover the link-layer address of another on-link IPv6 node.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Neighbor Discovery Advertisement (ICMPv6-In)</td><td>Neighbor Discovery Advertisement messages are sent by nodes to notify other nodes of link-layer address changes or in response to a Neighbor Discovery Solicitation request.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Neighbor Discovery Advertisement (ICMPv6-Out)</td><td>Neighbor Discovery Advertisement messages are sent by nodes to notify other nodes of link-layer address changes or in response to a Neighbor Discovery Solicitation request.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Router Advertisement (ICMPv6-In)</td><td>Router Advertisement messages are sent by routers to other nodes for stateless auto-configuration.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Router Advertisement (ICMPv6-Out)</td><td>Router Advertisement messages are sent by routers to other nodes for stateless auto-configuration.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Router Solicitation (ICMPv6-In)</td><td>Router Solicitation messages are sent by nodes seeking routers to provide stateless auto-configuration.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Router Solicitation (ICMPv6-Out)</td><td>Router Solicitation messages are sent by nodes seeking routers to provide stateless auto-configuration.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Query (ICMPv6-In)</td><td>An IPv6 multicast-capable router uses the Multicast Listener Query message to query a link for multicast group membership.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Query (ICMPv6-Out)</td><td>An IPv6 multicast-capable router uses the Multicast Listener Query message to query a link for multicast group membership.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Report (ICMPv6-In)</td><td>The Multicast Listener Report message is used by a listening node to either immediately report its interest in receiving multicast traffic at a specific multicast address or in response to a Multicast Listener Query.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Report (ICMPv6-Out)</td><td>The Multicast Listener Report message is used by a listening node to either immediately report its interest in receiving multicast traffic at a specific multicast address or in response to a Multicast Listener Query.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Report v2 (ICMPv6-In)</td><td>Multicast Listener Report v2 message is used by a listening node to either immediately report its interest in receiving multicast traffic at a specific multicast address or in response to a Multicast Listener Query.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Report v2 (ICMPv6-Out)</td><td>Multicast Listener Report v2 message is used by a listening node to either immediately report its interest in receiving multicast traffic at a specific multicast address or in response to a Multicast Listener Query.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Done (ICMPv6-In)</td><td>Multicast Listener Done messages inform local routers that there are no longer any members remaining for a specific multicast address on the subnet.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Multicast Listener Done (ICMPv6-Out)</td><td>Multicast Listener Done messages inform local routers that there are no longer any members remaining for a specific multicast address on the subnet.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Destination Unreachable Fragmentation Needed (ICMPv4-In)</td><td>Destination Unreachable Fragmentation Needed error messages are sent from any node that a packet traverses which is unable to forward the packet because fragmentation was needed and the don’t fragment bit was set.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Internet Group Management Protocol (IGMP-In)</td><td>IGMP messages are sent and received by nodes to create, join and depart multicast groups.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Internet Group Management Protocol (IGMP-Out)</td><td>IGMP messages are sent and received by nodes to create, join and depart multicast groups.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Dynamic Host Configuration Protocol (DHCP-In)</td><td>Allows DHCP (Dynamic Host Configuration Protocol) messages for stateful auto-configuration.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Dynamic Host Configuration Protocol (DHCP-Out)</td><td>Allows DHCP (Dynamic Host Configuration Protocol) messages for stateful auto-configuration.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Dynamic Host Configuration Protocol for IPv6(DHCPV6-In)</td><td>Allows DHCPV6 (Dynamic Host Configuration Protocol for IPv6) messages for stateful and stateless configuration.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Dynamic Host Configuration Protocol for IPv6(DHCPV6-Out)</td><td>Allows DHCPV6 (Dynamic Host Configuration Protocol for IPv6) messages for stateful and stateless configuration.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Teredo (UDP-In)</td><td>Inbound UDP rule to allow Teredo edge traversal, a technology that provides address assignment and automatic tunneling for unicast IPv6 traffic when an IPv6/IPv4 host is located behind an IPv4 network address translator.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Teredo (UDP-Out)</td><td>Outbound UDP rule to allow Teredo edge traversal, a technology that provides address assignment and automatic tunneling for unicast IPv6 traffic when an IPv6/IPv4 host is located behind an IPv4 network address translator.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - IPHTTPS (TCP-In)</td><td>Inbound TCP rule to allow IPHTTPS tunneling technology to provide connectivity across HTTP proxies and firewalls.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - IPHTTPS (TCP-Out)</td><td>Outbound TCP rule to allow IPHTTPS tunneling technology to provide connectivity across HTTP proxies and firewalls.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - IPv6 (IPv6-In)</td><td>Inbound rule required to permit IPv6 traffic for ISATAP (Intra-Site Automatic Tunnel Addressing Protocol) and 6to4 tunneling services.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - IPv6 (IPv6-Out)</td><td>Outbound rule required to permit IPv6 traffic for ISATAP (Intra-Site Automatic Tunnel Addressing Protocol) and 6to4 tunneling services.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Group Policy (NP-Out)</td><td>Core Networking - Group Policy (NP-Out)</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Core Networking - Group Policy (TCP-Out)</td><td>Outbound rule to allow remote RPC traffic for Group Policy updates. [TCP]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Core Networking - DNS (UDP-Out)</td><td>Outbound rule to allow DNS requests. DNS responses based on requests that matched this rule will be permitted regardless of source address.  This behavior is classified as loose source mapping. [LSM] [UDP 53]</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Core Networking - Group Policy (LSASS-Out)</td><td>Outbound rule to allow remote LSASS traffic for Group Policy updates [TCP].</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Remote Service Management (RPC)</td><td>Inbound rule for the local Service Control Manager to be remotely managed via RPC/TCP.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Remote Service Management (NP-In)</td><td>Inbound rule for the local Service Control Manager to be remotely managed over Named Pipes.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Remote Service Management (RPC-EPMAP)</td><td>Inbound rule for the RPCSS service to allow RPC/TCP traffic for the local Service Control Manager.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>mDNS (UDP-In)</td><td>Inbound rule for mDNS traffic [UDP]</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>mDNS (UDP-Out)</td><td>Outbound rule for mDNS traffic [UDP]</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>DIAL protocol server (HTTP-In)</td><td>Inbound rule for DIAL protocol server to allow remote control of Apps using HTTP. [TCP 10247]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>DIAL protocol server (HTTP-In)</td><td>Inbound rule for DIAL protocol server to allow remote control of Apps using HTTP. [TCP 10247]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Cast to Device streaming server (HTTP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using HTTP. [TCP 10246]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Cast to Device streaming server (HTTP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using HTTP. [TCP 10246]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Cast to Device streaming server (HTTP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using HTTP. [TCP 10246]</td><td>Inbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Cast to Device streaming server (RTCP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [UDP]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Cast to Device streaming server (RTCP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [UDP]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Cast to Device streaming server (RTCP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [UDP]</td><td>Inbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Cast to Device streaming server (RTP-Streaming-Out)</td><td>Outbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [UDP]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Cast to Device streaming server (RTP-Streaming-Out)</td><td>Outbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [UDP]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Cast to Device streaming server (RTP-Streaming-Out)</td><td>Outbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [UDP]</td><td>Outbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Cast to Device streaming server (RTSP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [TCP 23554, 23555, 23556]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>Cast to Device streaming server (RTSP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [TCP 23554, 23555, 23556]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Cast to Device streaming server (RTSP-Streaming-In)</td><td>Inbound rule for the Cast to Device server to allow streaming using RTSP and RTP. [TCP 23554, 23555, 23556]</td><td>Inbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Cast to Device SSDP Discovery (UDP-In)</td><td>Inbound rule to allow discovery of Cast to Device targets using SSDP</td><td>Inbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Cast to Device UPnP Events (TCP-In)</td><td>Inbound rule to allow receiving UPnP Events from Cast to Device targets</td><td>Inbound</td><td>Allow</td><td>Public</td></tr> <tr><td>Cast to Device functionality (qWave-UDP-In)</td><td>Inbound rule for the Cast to Device functionality to allow use of the Quality Windows Audio Video Experience Service. [UDP 2177]</td><td>Inbound</td><td>Allow</td><td>Private, Public</td></tr> <tr><td>Cast to Device functionality (qWave-UDP-Out)</td><td>Outbound rule for the Cast to Device functionality to allow use of the Quality Windows Audio Video Experience Service. [UDP 2177]</td><td>Outbound</td><td>Allow</td><td>Private, Public</td></tr> <tr><td>Cast to Device functionality (qWave-TCP-In)</td><td>Inbound rule for the Cast to Device functionality to allow use of the Quality Windows Audio Video Experience Service. [TCP 2177]</td><td>Inbound</td><td>Allow</td><td>Private, Public</td></tr> <tr><td>Cast to Device functionality (qWave-TCP-Out)</td><td>Outbound rule for the Cast to Device functionality to allow use of the Quality Windows Audio Video Experience Service. [TCP 2177]</td><td>Outbound</td><td>Allow</td><td>Private, Public</td></tr> <tr><td>Work or school account</td><td>Work or school account</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Work or school account</td><td>Work or school account</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Your account</td><td>Your account</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Your account</td><td>Your account</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Windows Shell Experience</td><td>Windows Shell Experience</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Cortana</td><td>Search the web and Windows</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Cortana</td><td>Search the web and Windows</td><td>Inbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Email and accounts</td><td>Email and accounts</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Windows Default Lock Screen</td><td>Windows Default Lock Screen</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>SmartScreen</td><td>SmartScreen</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Xbox Game UI</td><td>Xbox Game UI</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Work or school account</td><td>Work or school account</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Work or school account</td><td>Work or school account</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Your account</td><td>Your account</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Your account</td><td>Your account</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Windows Shell Experience</td><td>Windows Shell Experience</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Cortana</td><td>Search the web and Windows</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Cortana</td><td>Search the web and Windows</td><td>Inbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Email and accounts</td><td>Email and accounts</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Windows Default Lock Screen</td><td>Windows Default Lock Screen</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>SmartScreen</td><td>SmartScreen</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Xbox Game UI</td><td>Xbox Game UI</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Network Discovery (Pub WSD-Out)</td><td>Outbound rule for Network Discovery to discover devices via Function Discovery. [UDP 3702]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (Pub-WSD-In)</td><td>Inbound rule for Network Discovery to discover devices via Function Discovery. [UDP 3702]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (LLMNR-UDP-Out)</td><td>Outbound rule for Network Discovery to allow Link Local Multicast Name Resolution. [UDP 5355]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (LLMNR-UDP-In)</td><td>Inbound rule for Network Discovery to allow Link Local Multicast Name Resolution. [UDP 5355]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (WSD-Out)</td><td>Outbound rule for Network Discovery to discover devices via Function Discovery. [UDP 3702]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (WSD-In)</td><td>Inbound rule for Network Discovery to discover devices via Function Discovery. [UDP 3702]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (UPnPHost-Out)</td><td>Outbound rule for Network Discovery to allow use of Universal Plug and Play. [TCP]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (SSDP-Out)</td><td>Outbound rule for Network Discovery to allow use of the Simple Service Discovery Protocol. [UDP 1900]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (SSDP-In)</td><td>Inbound rule for Network Discovery to allow use of the Simple Service Discovery Protocol. [UDP 1900]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (WSD Events-Out)</td><td>Outbound rule for Network Discovery to allow WSDAPI Events via Function Discovery. [TCP 5357]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (WSD Events-In)</td><td>Inbound rule for Network Discovery to allow WSDAPI Events via Function Discovery. [TCP 5357]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (WSD EventsSecure-Out)</td><td>Outbound rule for Network Discovery to allow Secure WSDAPI Events via Function Discovery. [TCP 5358]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (WSD EventsSecure-In)</td><td>Inbound rule for Network Discovery to allow Secure WSDAPI Events via Function Discovery. [TCP 5358]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (NB-Datagram-Out)</td><td>Outbound rule for Network Discovery to allow NetBIOS Datagram transmission and reception. [UDP 138]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (NB-Datagram-In)</td><td>Inbound rule for Network Discovery to allow NetBIOS Datagram transmission and reception. [UDP 138]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (NB-Name-Out)</td><td>Outbound rule for Network Discovery to allow NetBIOS Name Resolution. [UDP 137]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (NB-Name-In)</td><td>Inbound rule for Network Discovery to allow NetBIOS Name Resolution. [UDP 137]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (UPnP-Out)</td><td>Outbound rule for Network Discovery to allow use of Universal Plug and Play. [TCP]</td><td>Outbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Network Discovery (UPnP-In)</td><td>Inbound rule for Network Discovery to allow use of Universal Plug and Play. [TCP 2869]</td><td>Inbound</td><td>Allow</td><td>Private</td></tr> <tr><td>Work or school account</td><td>Work or school account</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Work or school account</td><td>Work or school account</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Your account</td><td>Your account</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Your account</td><td>Your account</td><td>Inbound</td><td>Allow</td><td>Domain, Private</td></tr> <tr><td>Windows Shell Experience</td><td>Windows Shell Experience</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Email and accounts</td><td>Email and accounts</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Cortana</td><td>Search the web and Windows</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Cortana</td><td>Search the web and Windows</td><td>Inbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Windows Default Lock Screen</td><td>Windows Default Lock Screen</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>SmartScreen</td><td>SmartScreen</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>Xbox Game UI</td><td>Xbox Game UI</td><td>Outbound</td><td>Allow</td><td>Domain, Private, Public</td></tr> <tr><td>World Wide Web Services (HTTP Traffic-In)</td><td>An inbound rule to allow HTTP traffic for Internet Information Services (IIS) [TCP 80]</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>World Wide Web Services (HTTPS Traffic-In)</td><td>An inbound rule to allow HTTPS traffic for Internet Information Services (IIS) [TCP 443]</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Windows Communication Foundation Net.TCP Listener Adapter (TCP-In)</td><td>An inbound rule for Windows Communication Foundation to allow TCP traffic to the Net.TCP Listener Adapter [TCP 808]</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>AppFabric Caching Service (TCP-In)</td><td>Inbound rule for AppFabric Server to allow AppFabric Caching Service TCP.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>AppFabric Caching Service (TCP-Out)</td><td>Outbound rule for AppFabric Server to allow AppFabric Caching Service TCP.</td><td>Outbound</td><td>Allow</td><td>Any</td></tr> <tr><td>SPUserCodeV4</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>SharePoint Search</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>SharePoint Central Administration v4</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>SharePoint - 80</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>File and Printer Sharing (LLMNR-UDP-Out)</td><td>Outbound rule for File and Printer Sharing to allow Link Local Multicast Name Resolution. [UDP 5355]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (LLMNR-UDP-In)</td><td>Inbound rule for File and Printer Sharing to allow Link Local Multicast Name Resolution. [UDP 5355]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (Echo Request - ICMPv6-Out)</td><td>Echo Request messages are sent as ping requests to other nodes.</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (Echo Request - ICMPv6-In)</td><td>Echo Request messages are sent as ping requests to other nodes.</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (Echo Request - ICMPv4-Out)</td><td>Echo Request messages are sent as ping requests to other nodes.</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (Echo Request - ICMPv4-In)</td><td>Echo Request messages are sent as ping requests to other nodes.</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (Spooler Service - RPC-EPMAP)</td><td>Inbound rule for the RPCSS service to allow RPC/TCP traffic for the Spooler Service.</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (Spooler Service - RPC)</td><td>Inbound rule for File and Printer Sharing to allow the Print Spooler Service to communicate via TCP/RPC.</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (NB-Datagram-Out)</td><td>Outbound rule for File and Printer Sharing to allow NetBIOS Datagram transmission and reception. [UDP 138]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (NB-Datagram-In)</td><td>Inbound rule for File and Printer Sharing to allow NetBIOS Datagram transmission and reception. [UDP 138]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (NB-Name-Out)</td><td>Outbound rule for File and Printer Sharing to allow NetBIOS Name Resolution. [UDP 137]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (NB-Name-In)</td><td>Inbound rule for File and Printer Sharing to allow NetBIOS Name Resolution. [UDP 137]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (SMB-Out)</td><td>Outbound rule for File and Printer Sharing to allow Server Message Block transmission and reception via Named Pipes. [TCP 445]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (SMB-In)</td><td>Inbound rule for File and Printer Sharing to allow Server Message Block transmission and reception via Named Pipes. [TCP 445]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (NB-Session-Out)</td><td>Outbound rule for File and Printer Sharing to allow NetBIOS Session Service connections. [TCP 139]</td><td>Outbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File and Printer Sharing (NB-Session-In)</td><td>Inbound rule for File and Printer Sharing to allow NetBIOS Session Service connections. [TCP 139]</td><td>Inbound</td><td>Allow</td><td>Domain</td></tr> <tr><td>File Server Remote Management (WMI-In)</td><td>Inbound rule to allow WMI traffic to manage the File Services role.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>File Server Remote Management (DCOM-In)</td><td>Inbound rule to allow DCOM traffic to manage the File Services role.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>File Server Remote Management (SMB-In)</td><td>Inbound rule to allow SMB traffic to manage the File Services role.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Microsoft Project Server Queuing Service executes project related jobs asynchronously. Example queue jobs: Save project, publish project, submit timesheet.</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Microsoft Project Server Events Service executes events triggered by changes to entities on the ProjectServer.</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Microsoft Project Server Calculation Service manages the lifecycle and the communication of the processes that handle modifications to projects.</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>SharePoint Web Services</td><td></td><td>Inbound</td><td>Allow</td><td>Any</td></tr> <tr><td>Microsoft Edge (mDNS-In)</td><td>Inbound rule for Microsoft Edge to allow mDNS traffic.</td><td>Inbound</td><td>Allow</td><td>Any</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="ps-policy" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#9881;</span> PowerShell Execution Policy</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>PowerShell Execution Policy (All Scopes)</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Scope</th><th>Execution Policy</th><th>Security Risk</th></tr> <tr><td>MachinePolicy</td><td>Undefined</td><td>Not configured</td></tr> <tr><td>UserPolicy</td><td>Undefined</td><td>Not configured</td></tr> <tr><td>Process</td><td>Undefined</td><td>Not configured</td></tr> <tr><td>CurrentUser</td><td>Unrestricted</td><td>High Risk - Allows all scripts</td></tr> <tr><td>LocalMachine</td><td>Unrestricted</td><td>High Risk - Allows all scripts</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="rdp-security" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128274;</span> RDP Security</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>RDP Security (Network Level Authentication)</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>Network Level Authentication</th><th>RDP Enabled</th><th>Security Layer</th><th>Encryption Level</th><th>Security Assessment</th></tr> <tr><td>Enabled (Secure)</td><td>Disabled</td><td>SSL (TLS 1.0)</td><td>Client Compatible</td><td>Review Required - Security Risks Present</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="certificates" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128196;</span> Certificates</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Certificate Expiry Analysis</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Subject</th><th>Issuer</th><th>Expiration Date</th><th>Days to Expire</th><th>Thumbprint</th><th>Has Private Key</th><th>Key Usage</th><th>Status</th></tr> <tr><td>CN=SP1.abc.local</td><td>CN=abc-PDC-CA, DC=abc, DC=local</td><td>2026-06-15</td><td>359</td><td>1EF6E899B5E93B9BCF4398516CB17E8E93818BD8</td><td>True</td><td>Digital Signature, Key Encipherment (a0)</td><td>Unable to determine expiry</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="dns-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#127760;</span> DNS Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>DNS Client Settings</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>DNS Servers</th><th>DNS Over HTTPS</th><th>DNS Cache</th><th>DNS Suffix Search List</th><th>Secure Name Resolution</th></tr> <tr><td>Ethernet: 192.168.1.160; Loopback Pseudo-Interface 1: ; Teredo Tunneling Pseudo-Interface: ; isatap.{1D5E0EAA-61BA-401C-A1F2-A3DE65E31AF0}: 192.168.1.160</td><td>Not Available</td><td>38</td><td>abc.local</td><td>No DNSSEC Policies</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="defender-asr" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128737;</span> Defender ASR Rules</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Windows Defender Attack Surface Reduction (ASR) & Exploit Guard</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>ASR Rules Enabled</th><th>ASR Rules Status</th><th>Controlled Folder Access</th><th>Exploit Protection</th><th>Network Protection</th></tr> <tr><td>0</td><td>Not Configured</td><td></td><td>Not Available</td><td></td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="exploit-protection" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128737;</span> Exploit Protection</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Exploit Protection Settings</h2> <table> <colgroup><col/></colgroup> <tr><th>*</th></tr> <tr><td>Error</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="shares" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128193;</span> SMB Shares</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>SMB Shares</h2> <table> <colgroup><col/><col/><col/><col/><col/><col/><col/></colgroup> <tr><th>Share Type</th><th>Folder Enumeration Mode</th><th>Description</th><th>Share Folder Name</th><th>Share Folder Path</th><th>Is Shadow Copy</th><th>Volume</th></tr> <tr><td>FileSystemDirectory</td><td>Unrestricted</td><td>Remote Admin</td><td>ADMIN$</td><td>C:\Windows</td><td>False</td><td>\\?\Volume{c50ff652-69c2-4b8e-968e-6398b622b1b5}\</td></tr> <tr><td>FileSystemDirectory</td><td>Unrestricted</td><td></td><td>Analytics_17d21660-8061-4c23-9112-b1e091037387</td><td>C:\Program Files\Microsoft Office Servers\16.0\Data\Office Server\Analytics_17d21660-8061-4c23-9112-b1e091037387</td><td>False</td><td>\\?\Volume{c50ff652-69c2-4b8e-968e-6398b622b1b5}\</td></tr> <tr><td>FileSystemDirectory</td><td>Unrestricted</td><td>Default share</td><td>C$</td><td>C:\</td><td>False</td><td>\\?\Volume{c50ff652-69c2-4b8e-968e-6398b622b1b5}\</td></tr> <tr><td>FileSystemDirectory</td><td>Unrestricted</td><td>Crawled Files Share17d21660-8061-4c23-9112-b1e091037387-crawl-0</td><td>gthrsvc_17d21660-8061-4c23-9112-b1e091037387-crawl-0</td><td>C:\Program Files\Microsoft Office Servers\16.0\Data\Office Server\Applications\17d21660-8061-4c23-9112-b1e091037387-crawl-0\gthrsvc</td><td>False</td><td>\\?\Volume{c50ff652-69c2-4b8e-968e-6398b622b1b5}\</td></tr> <tr><td>InterprocessCommunication</td><td>Unrestricted</td><td>Remote IPC</td><td>IPC$</td><td></td><td>False</td><td></td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="audit-settings" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128202;</span> Audit Settings</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Audit Policies Settings</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Category</th><th>Setting</th><th>Timestamp</th></tr> <tr><td>System</td><td>System</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Security System Extension               No Auditing</td><td>Security System Extension               No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>System Integrity                        Success and Failure</td><td>System Integrity                        Success and Failure</td><td>2025-06-20 21:53:53</td></tr> <tr><td>IPsec Driver                            No Auditing</td><td>IPsec Driver                            No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Other System Events                     Success and Failure</td><td>Other System Events                     Success and Failure</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Security State Change                   Success</td><td>Security State Change                   Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Logon                                   Success and Failure</td><td>Logon                                   Success and Failure</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Logoff                                  Success</td><td>Logoff                                  Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Account Lockout                         Success</td><td>Account Lockout                         Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>IPsec Main Mode                         No Auditing</td><td>IPsec Main Mode                         No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>IPsec Quick Mode                        No Auditing</td><td>IPsec Quick Mode                        No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>IPsec Extended Mode                     No Auditing</td><td>IPsec Extended Mode                     No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Special Logon                           Success</td><td>Special Logon                           Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Network Policy Server                   Success and Failure</td><td>Network Policy Server                   Success and Failure</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Group Membership                        No Auditing</td><td>Group Membership                        No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Object Access</td><td>Object Access</td><td>2025-06-20 21:53:53</td></tr> <tr><td>File System                             No Auditing</td><td>File System                             No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Registry                                No Auditing</td><td>Registry                                No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Kernel Object                           No Auditing</td><td>Kernel Object                           No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>SAM                                     No Auditing</td><td>SAM                                     No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Certification Services                  No Auditing</td><td>Certification Services                  No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Application Generated                   No Auditing</td><td>Application Generated                   No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Handle Manipulation                     No Auditing</td><td>Handle Manipulation                     No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>File Share                              No Auditing</td><td>File Share                              No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Filtering Platform Packet Drop          No Auditing</td><td>Filtering Platform Packet Drop          No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Filtering Platform Connection           No Auditing</td><td>Filtering Platform Connection           No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Other Object Access Events              No Auditing</td><td>Other Object Access Events              No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Detailed File Share                     No Auditing</td><td>Detailed File Share                     No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Removable Storage                       No Auditing</td><td>Removable Storage                       No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Central Policy Staging                  No Auditing</td><td>Central Policy Staging                  No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Privilege Use</td><td>Privilege Use</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Non Sensitive Privilege Use             No Auditing</td><td>Non Sensitive Privilege Use             No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Other Privilege Use Events              No Auditing</td><td>Other Privilege Use Events              No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Sensitive Privilege Use                 No Auditing</td><td>Sensitive Privilege Use                 No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Detailed Tracking</td><td>Detailed Tracking</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Process Creation                        No Auditing</td><td>Process Creation                        No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Process Termination                     No Auditing</td><td>Process Termination                     No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>DPAPI Activity                          No Auditing</td><td>DPAPI Activity                          No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>RPC Events                              No Auditing</td><td>RPC Events                              No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Plug and Play Events                    No Auditing</td><td>Plug and Play Events                    No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Token Right Adjusted Events             No Auditing</td><td>Token Right Adjusted Events             No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Policy Change</td><td>Policy Change</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Audit Policy Change                     Success</td><td>Audit Policy Change                     Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Authentication Policy Change            Success</td><td>Authentication Policy Change            Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Authorization Policy Change             No Auditing</td><td>Authorization Policy Change             No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>MPSSVC Rule-Level Policy Change         No Auditing</td><td>MPSSVC Rule-Level Policy Change         No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Filtering Platform Policy Change        No Auditing</td><td>Filtering Platform Policy Change        No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Other Policy Change Events              No Auditing</td><td>Other Policy Change Events              No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Account Management</td><td>Account Management</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Computer Account Management             Success</td><td>Computer Account Management             Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Security Group Management               Success</td><td>Security Group Management               Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Distribution Group Management           No Auditing</td><td>Distribution Group Management           No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Application Group Management            No Auditing</td><td>Application Group Management            No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Other Account Management Events         No Auditing</td><td>Other Account Management Events         No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>User Account Management                 Success</td><td>User Account Management                 Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>DS Access</td><td>DS Access</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Directory Service Access                Success</td><td>Directory Service Access                Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Directory Service Changes               No Auditing</td><td>Directory Service Changes               No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Directory Service Replication           No Auditing</td><td>Directory Service Replication           No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Detailed Directory Service Replication  No Auditing</td><td>Detailed Directory Service Replication  No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Account Logon</td><td>Account Logon</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Kerberos Service Ticket Operations      Success</td><td>Kerberos Service Ticket Operations      Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Other Account Logon Events              No Auditing</td><td>Other Account Logon Events              No Auditing</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Kerberos Authentication Service         Success</td><td>Kerberos Authentication Service         Success</td><td>2025-06-20 21:53:53</td></tr> <tr><td>Credential Validation                   Success</td><td>Credential Validation                   Success</td><td>2025-06-20 21:53:53</td></tr> </table>
+                        </div>
+                    </div>
+                </div>
+            </div>            
+            <!-- Tasks, Startup & Logs Section -->
+            <div id="tasks-logs" class="section">
+                <div class="section-header">
+                    <h2><span class="icon-emoji">&#128203;</span> Scheduled Tasks, Startup, and Logs Retention</h2>
+                </div>
+                <div class="section-content">
+                    <div id="event-logs" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128221;</span> Event Logs Size and Retention</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <div class='table-container'><h2>Event Viewer Logs Size and Retention Details</h2> <table> <colgroup><col/><col/><col/><col/><col/></colgroup> <tr><th>Log Name</th><th>Maximum Log Size (KB)</th><th>Overflow Action</th><th>Minimum Retention (Days)</th><th>Event Raising Enabled</th></tr> <tr><td>Application</td><td>20480</td><td>OverwriteAsNeeded</td><td>0</td><td>False</td></tr> <tr><td>Hardware Events</td><td>20480</td><td>OverwriteAsNeeded</td><td>0</td><td>False</td></tr> <tr><td>Internet Explorer</td><td>512</td><td>OverwriteOlder</td><td>7</td><td>False</td></tr> <tr><td>Key Management Service</td><td>20480</td><td>OverwriteAsNeeded</td><td>0</td><td>False</td></tr> <tr><td>Security</td><td>20480</td><td>OverwriteAsNeeded</td><td>0</td><td>False</td></tr> <tr><td>Setup</td><td>512</td><td>OverwriteOlder</td><td>7</td><td>False</td></tr> <tr><td>System</td><td>20480</td><td>OverwriteAsNeeded</td><td>0</td><td>False</td></tr> <tr><td>Windows PowerShell</td><td>15360</td><td>OverwriteAsNeeded</td><td>0</td><td>False</td></tr> </table></div>
+                        </div>
+                    </div>
+                    
+                    <div id="startup-programs" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128640;</span> Startup Programs</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Startup Programs</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>Name</th><th>Command</th><th>Location</th></tr> <tr><td>DWPersistentQueuedReporting</td><td>C:\PROGRA~1\COMMON~1\MICROS~1\DW\DWTRIG20.EXE -a</td><td>HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run</td></tr> </table>
+                        </div>
+                    </div>
+                    
+                    <div id="scheduled-tasks" class="subsection">
+                        <div class="subsection-header">
+                            <h3><span class="icon-emoji">&#128203;</span> Scheduled Tasks</h3>
+                        </div>
+                        <div class="subsection-content">
+                            <h2>Scheduled Tasks</h2> <table> <colgroup><col/><col/><col/></colgroup> <tr><th>TaskName</th><th>State</th><th>Taskpath</th></tr> <tr><td>CreateExplorerShellUnelevatedTask</td><td>Running</td><td>\</td></tr> <tr><td>MicrosoftEdgeUpdateTaskMachineCore{B64C0F49-7EB9-4984-AAA7-FE9ADE122BEC}</td><td>Running</td><td>\</td></tr> <tr><td>MicrosoftEdgeUpdateTaskMachineUA{6ADE5785-78A7-4A62-83EF-D99BFCEC5702}</td><td>Ready</td><td>\</td></tr> <tr><td>User_Feed_Synchronization-{4629AE38-9853-45D9-A7D9-A3285C88CFD6}</td><td>Ready</td><td>\</td></tr> <tr><td>.NET Framework NGEN v4.0.30319</td><td>Ready</td><td>\Microsoft\Windows\.NET Framework\</td></tr> <tr><td>.NET Framework NGEN v4.0.30319 64</td><td>Ready</td><td>\Microsoft\Windows\.NET Framework\</td></tr> <tr><td>.NET Framework NGEN v4.0.30319 64 Critical</td><td>Disabled</td><td>\Microsoft\Windows\.NET Framework\</td></tr> <tr><td>.NET Framework NGEN v4.0.30319 Critical</td><td>Disabled</td><td>\Microsoft\Windows\.NET Framework\</td></tr> <tr><td>AD RMS Rights Policy Template Management (Automated)</td><td>Disabled</td><td>\Microsoft\Windows\Active Directory Rights Management Services Client\</td></tr> <tr><td>AD RMS Rights Policy Template Management (Manual)</td><td>Ready</td><td>\Microsoft\Windows\Active Directory Rights Management Services Client\</td></tr> <tr><td>Consolidator</td><td>Ready</td><td>\Microsoft\Windows\AppFabric\Customer Experience Improvement Program\</td></tr> <tr><td>EDP Policy Manager</td><td>Ready</td><td>\Microsoft\Windows\AppID\</td></tr> <tr><td>PolicyConverter</td><td>Disabled</td><td>\Microsoft\Windows\AppID\</td></tr> <tr><td>SmartScreenSpecific</td><td>Ready</td><td>\Microsoft\Windows\AppID\</td></tr> <tr><td>VerifiedPublisherCertStoreCheck</td><td>Disabled</td><td>\Microsoft\Windows\AppID\</td></tr> <tr><td>Microsoft Compatibility Appraiser</td><td>Ready</td><td>\Microsoft\Windows\Application Experience\</td></tr> <tr><td>ProgramDataUpdater</td><td>Ready</td><td>\Microsoft\Windows\Application Experience\</td></tr> <tr><td>StartupAppTask</td><td>Ready</td><td>\Microsoft\Windows\Application Experience\</td></tr> <tr><td>appuriverifierdaily</td><td>Ready</td><td>\Microsoft\Windows\ApplicationData\</td></tr> <tr><td>appuriverifierinstall</td><td>Ready</td><td>\Microsoft\Windows\ApplicationData\</td></tr> <tr><td>CleanupTemporaryState</td><td>Ready</td><td>\Microsoft\Windows\ApplicationData\</td></tr> <tr><td>DsSvcCleanup</td><td>Ready</td><td>\Microsoft\Windows\ApplicationData\</td></tr> <tr><td>Pre-staged app cleanup</td><td>Disabled</td><td>\Microsoft\Windows\AppxDeploymentClient\</td></tr> <tr><td>Proxy</td><td>Ready</td><td>\Microsoft\Windows\Autochk\</td></tr> <tr><td>UninstallDeviceTask</td><td>Ready</td><td>\Microsoft\Windows\Bluetooth\</td></tr> <tr><td>AikCertEnrollTask</td><td>Ready</td><td>\Microsoft\Windows\CertificateServicesClient\</td></tr> <tr><td>CryptoPolicyTask</td><td>Ready</td><td>\Microsoft\Windows\CertificateServicesClient\</td></tr> <tr><td>KeyPreGenTask</td><td>Ready</td><td>\Microsoft\Windows\CertificateServicesClient\</td></tr> <tr><td>SystemTask</td><td>Ready</td><td>\Microsoft\Windows\CertificateServicesClient\</td></tr> <tr><td>UserTask</td><td>Ready</td><td>\Microsoft\Windows\CertificateServicesClient\</td></tr> <tr><td>UserTask-Roam</td><td>Ready</td><td>\Microsoft\Windows\CertificateServicesClient\</td></tr> <tr><td>ProactiveScan</td><td>Ready</td><td>\Microsoft\Windows\Chkdsk\</td></tr> <tr><td>License Validation</td><td>Disabled</td><td>\Microsoft\Windows\Clip\</td></tr> <tr><td>CreateObjectTask</td><td>Ready</td><td>\Microsoft\Windows\CloudExperienceHost\</td></tr> <tr><td>Consolidator</td><td>Ready</td><td>\Microsoft\Windows\Customer Experience Improvement Program\</td></tr> <tr><td>KernelCeipTask</td><td>Ready</td><td>\Microsoft\Windows\Customer Experience Improvement Program\</td></tr> <tr><td>UsbCeip</td><td>Ready</td><td>\Microsoft\Windows\Customer Experience Improvement Program\</td></tr> <tr><td>Data Integrity Scan</td><td>Ready</td><td>\Microsoft\Windows\Data Integrity Scan\</td></tr> <tr><td>Data Integrity Scan for Crash Recovery</td><td>Ready</td><td>\Microsoft\Windows\Data Integrity Scan\</td></tr> <tr><td>ScheduledDefrag</td><td>Ready</td><td>\Microsoft\Windows\Defrag\</td></tr> <tr><td>Device</td><td>Ready</td><td>\Microsoft\Windows\Device Information\</td></tr> <tr><td>Metadata Refresh</td><td>Ready</td><td>\Microsoft\Windows\Device Setup\</td></tr> <tr><td>Scheduled</td><td>Ready</td><td>\Microsoft\Windows\Diagnosis\</td></tr> <tr><td>SilentCleanup</td><td>Ready</td><td>\Microsoft\Windows\DiskCleanup\</td></tr> <tr><td>Microsoft-Windows-DiskDiagnosticDataCollector</td><td>Ready</td><td>\Microsoft\Windows\DiskDiagnostic\</td></tr> <tr><td>Microsoft-Windows-DiskDiagnosticResolver</td><td>Disabled</td><td>\Microsoft\Windows\DiskDiagnostic\</td></tr> <tr><td>Diagnostics</td><td>Ready</td><td>\Microsoft\Windows\DiskFootprint\</td></tr> <tr><td>StorageSense</td><td>Ready</td><td>\Microsoft\Windows\DiskFootprint\</td></tr> <tr><td>EDP App Launch Task</td><td>Ready</td><td>\Microsoft\Windows\EDP\</td></tr> <tr><td>EDP Auth Task</td><td>Ready</td><td>\Microsoft\Windows\EDP\</td></tr> <tr><td>EnableErrorDetailsUpdate</td><td>Ready</td><td>\Microsoft\Windows\ErrorDetails\</td></tr> <tr><td>ErrorDetailsUpdate</td><td>Disabled</td><td>\Microsoft\Windows\ErrorDetails\</td></tr> <tr><td>Installation</td><td>Ready</td><td>\Microsoft\Windows\LanguageComponentsInstaller\</td></tr> <tr><td>Uninstallation</td><td>Ready</td><td>\Microsoft\Windows\LanguageComponentsInstaller\</td></tr> <tr><td>TempSignedLicenseExchange</td><td>Ready</td><td>\Microsoft\Windows\License Manager\</td></tr> <tr><td>Notifications</td><td>Ready</td><td>\Microsoft\Windows\Location\</td></tr> <tr><td>WindowsActionDialog</td><td>Ready</td><td>\Microsoft\Windows\Location\</td></tr> <tr><td>WinSAT</td><td>Ready</td><td>\Microsoft\Windows\Maintenance\</td></tr> <tr><td>MapsToastTask</td><td>Ready</td><td>\Microsoft\Windows\Maps\</td></tr> <tr><td>MapsUpdateTask</td><td>Disabled</td><td>\Microsoft\Windows\Maps\</td></tr> <tr><td>ProcessMemoryDiagnosticEvents</td><td>Disabled</td><td>\Microsoft\Windows\MemoryDiagnostic\</td></tr> <tr><td>RunFullMemoryDiagnostic</td><td>Disabled</td><td>\Microsoft\Windows\MemoryDiagnostic\</td></tr> <tr><td>MNO Metadata Parser</td><td>Ready</td><td>\Microsoft\Windows\Mobile Broadband Accounts\</td></tr> <tr><td>LPRemove</td><td>Ready</td><td>\Microsoft\Windows\MUI\</td></tr> <tr><td>SystemSoundsService</td><td>Disabled</td><td>\Microsoft\Windows\Multimedia\</td></tr> <tr><td>GatherNetworkInfo</td><td>Ready</td><td>\Microsoft\Windows\NetTrace\</td></tr> <tr><td>SDN Diagnostics Task</td><td>Disabled</td><td>\Microsoft\Windows\Network Controller\</td></tr> <tr><td>Background Synchronization</td><td>Disabled</td><td>\Microsoft\Windows\Offline Files\</td></tr> <tr><td>Logon Synchronization</td><td>Disabled</td><td>\Microsoft\Windows\Offline Files\</td></tr> <tr><td>Secure-Boot-Update</td><td>Ready</td><td>\Microsoft\Windows\PI\</td></tr> <tr><td>Sqm-Tasks</td><td>Ready</td><td>\Microsoft\Windows\PI\</td></tr> <tr><td>Server Manager Performance Monitor</td><td>Disabled</td><td>\Microsoft\Windows\PLA\</td></tr> <tr><td>Device Install Group Policy</td><td>Ready</td><td>\Microsoft\Windows\Plug and Play\</td></tr> <tr><td>Device Install Reboot Required</td><td>Ready</td><td>\Microsoft\Windows\Plug and Play\</td></tr> <tr><td>Plug and Play Cleanup</td><td>Ready</td><td>\Microsoft\Windows\Plug and Play\</td></tr> <tr><td>Sysprep Generalize Drivers</td><td>Ready</td><td>\Microsoft\Windows\Plug and Play\</td></tr> <tr><td>AnalyzeSystem</td><td>Ready</td><td>\Microsoft\Windows\Power Efficiency Diagnostics\</td></tr> <tr><td>MobilityManager</td><td>Ready</td><td>\Microsoft\Windows\Ras\</td></tr> <tr><td>VerifyWinRE</td><td>Ready</td><td>\Microsoft\Windows\RecoveryEnvironment\</td></tr> <tr><td>RegIdleBackup</td><td>Ready</td><td>\Microsoft\Windows\Registry\</td></tr> <tr><td>CleanupOldPerfLogs</td><td>Ready</td><td>\Microsoft\Windows\Server Manager\</td></tr> <tr><td>ServerManager</td><td>Ready</td><td>\Microsoft\Windows\Server Manager\</td></tr> <tr><td>StartComponentCleanup</td><td>Ready</td><td>\Microsoft\Windows\Servicing\</td></tr> <tr><td>BackgroundUploadTask</td><td>Ready</td><td>\Microsoft\Windows\SettingSync\</td></tr> <tr><td>BackupTask</td><td>Ready</td><td>\Microsoft\Windows\SettingSync\</td></tr> <tr><td>NetworkStateChangeTask</td><td>Ready</td><td>\Microsoft\Windows\SettingSync\</td></tr> <tr><td>CreateObjectTask</td><td>Ready</td><td>\Microsoft\Windows\Shell\</td></tr> <tr><td>IndexerAutomaticMaintenance</td><td>Ready</td><td>\Microsoft\Windows\Shell\</td></tr> <tr><td>Collection</td><td>Disabled</td><td>\Microsoft\Windows\Software Inventory Logging\</td></tr> <tr><td>Configuration</td><td>Ready</td><td>\Microsoft\Windows\Software Inventory Logging\</td></tr> <tr><td>SvcRestartTask</td><td>Ready</td><td>\Microsoft\Windows\SoftwareProtectionPlatform\</td></tr> <tr><td>SvcRestartTaskLogon</td><td>Ready</td><td>\Microsoft\Windows\SoftwareProtectionPlatform\</td></tr> <tr><td>SvcRestartTaskNetwork</td><td>Ready</td><td>\Microsoft\Windows\SoftwareProtectionPlatform\</td></tr> <tr><td>SpaceAgentTask</td><td>Ready</td><td>\Microsoft\Windows\SpacePort\</td></tr> <tr><td>SpaceManagerTask</td><td>Ready</td><td>\Microsoft\Windows\SpacePort\</td></tr> <tr><td>SpeechModelDownloadTask</td><td>Ready</td><td>\Microsoft\Windows\Speech\</td></tr> <tr><td>Storage Tiers Management Initialization</td><td>Ready</td><td>\Microsoft\Windows\Storage Tiers Management\</td></tr> <tr><td>Storage Tiers Optimization</td><td>Disabled</td><td>\Microsoft\Windows\Storage Tiers Management\</td></tr> <tr><td>Interactive</td><td>Ready</td><td>\Microsoft\Windows\Task Manager\</td></tr> <tr><td>MsCtfMonitor</td><td>Running</td><td>\Microsoft\Windows\TextServicesFramework\</td></tr> <tr><td>ForceSynchronizeTime</td><td>Ready</td><td>\Microsoft\Windows\Time Synchronization\</td></tr> <tr><td>SynchronizeTimeZone</td><td>Ready</td><td>\Microsoft\Windows\Time Zone\</td></tr> <tr><td>Tpm-HASCertRetr</td><td>Ready</td><td>\Microsoft\Windows\TPM\</td></tr> <tr><td>Tpm-Maintenance</td><td>Ready</td><td>\Microsoft\Windows\TPM\</td></tr> <tr><td>AC Power Download</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>Maintenance Install</td><td>Disabled</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>MusUx_UpdateInterval</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>Policy Install</td><td>Disabled</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>Reboot</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>Refresh Settings</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>Resume On Boot</td><td>Disabled</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>Schedule Scan</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>USO_UxBroker_Display</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>USO_UxBroker_ReadyToReboot</td><td>Ready</td><td>\Microsoft\Windows\UpdateOrchestrator\</td></tr> <tr><td>UPnPHostConfig</td><td>Ready</td><td>\Microsoft\Windows\UPnP\</td></tr> <tr><td>HiveUploadTask</td><td>Disabled</td><td>\Microsoft\Windows\User Profile Service\</td></tr> <tr><td>ResolutionHost</td><td>Ready</td><td>\Microsoft\Windows\WDI\</td></tr> <tr><td>Windows Defender Cache Maintenance</td><td>Ready</td><td>\Microsoft\Windows\Windows Defender\</td></tr> <tr><td>Windows Defender Cleanup</td><td>Ready</td><td>\Microsoft\Windows\Windows Defender\</td></tr> <tr><td>Windows Defender Scheduled Scan</td><td>Ready</td><td>\Microsoft\Windows\Windows Defender\</td></tr> <tr><td>Windows Defender Verification</td><td>Ready</td><td>\Microsoft\Windows\Windows Defender\</td></tr> <tr><td>QueueReporting</td><td>Ready</td><td>\Microsoft\Windows\Windows Error Reporting\</td></tr> <tr><td>BfeOnServiceStartTypeChange</td><td>Ready</td><td>\Microsoft\Windows\Windows Filtering Platform\</td></tr> <tr><td>Calibration Loader</td><td>Disabled</td><td>\Microsoft\Windows\WindowsColorSystem\</td></tr> <tr><td>Automatic App Update</td><td>Ready</td><td>\Microsoft\Windows\WindowsUpdate\</td></tr> <tr><td>Scheduled Start</td><td>Ready</td><td>\Microsoft\Windows\WindowsUpdate\</td></tr> <tr><td>sih</td><td>Ready</td><td>\Microsoft\Windows\WindowsUpdate\</td></tr> <tr><td>sihboot</td><td>Ready</td><td>\Microsoft\Windows\WindowsUpdate\</td></tr> <tr><td>CacheTask</td><td>Running</td><td>\Microsoft\Windows\Wininet\</td></tr> <tr><td>Automatic-Device-Join</td><td>Disabled</td><td>\Microsoft\Windows\Workplace Join\</td></tr> <tr><td>XblGameSaveTask</td><td>Ready</td><td>\Microsoft\XblGameSave\</td></tr> <tr><td>XblGameSaveTaskLogon</td><td>Ready</td><td>\Microsoft\XblGameSave\</td></tr> </table>
+                        </div>
+                    </div>
+                </div>
+            </div>        </main>
+    </div>
+    
+    <div class="footer">
+        <div class="footer-info">
+            <div class="footer-item">
+                <strong>Report Generated:</strong><br>
+                2025-06-20 21:58:29
+            </div>
+            <div class="footer-item">
+                <strong>Assessment Tool:</strong><br>
+                Windows Server Assessment Tool V1.0
+            </div>
+            <div class="footer-item">
+                <strong>Created By:</strong><br>
+                Abdullah Zmaili
+            </div>
+            <div class="footer-item">
+                <strong>Server Assessed:</strong><br>                SP1
+            </div>
+        </div>    </div>
+    
+</body>
+</html>
