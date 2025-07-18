@@ -62,7 +62,6 @@ $csvRDPSecurity = Join-Path -Path $path -ChildPath "$ServerName-RDPSecurity.csv"
 $csvCertificates = Join-Path -Path $path -ChildPath "$ServerName-Certificates.csv"
 $csvDNSSettings = Join-Path -Path $path -ChildPath "$ServerName-DNSSettings.csv"
 $csvDefenderASR = Join-Path -Path $path -ChildPath "$ServerName-DefenderASR.csv"
-$csvDefenderExploit = Join-Path -Path $path -ChildPath "$ServerName-DefenderExploit.csv"
 
 # ----------------------------
 # MENU SELECTION
@@ -767,8 +766,7 @@ function Get-SecurityInformation {
         [string]$CsvRDPSecurity,
         [string]$CsvCertificates,
         [string]$CsvDNSSettings,
-        [string]$CsvDefenderASR,
-        [string]$CsvDefenderExploit
+        [string]$CsvDefenderASR
     )
       Write-Host "=== COLLECTING SECURITY INFORMATION ===" -ForegroundColor Cyan    # === Antivirus ===
     Write-Host "Collecting Antivirus Settings..." -ForegroundColor Yellow
@@ -1261,54 +1259,6 @@ function Get-SecurityInformation {
     $defenderASR | Export-Csv -Path $CsvDefenderASR -NoTypeInformation
     $defenderASRHtml = $defenderASR | ConvertTo-Html -Fragment -PreContent "<h2>Windows Defender Attack Surface Reduction (ASR) & Exploit Guard</h2>"
 
-    # === Detailed Exploit Protection Settings ===
-    Write-Host "Collecting Exploit Protection Settings..." -ForegroundColor Yellow
-    try {
-        $exploitSettings = @()
-        $systemMitigation = Get-ProcessMitigation -System -ErrorAction SilentlyContinue
-        if($systemMitigation) {            $exploitSettings += [PSCustomObject]@{
-                Process = "System-wide"
-                DEP = if($systemMitigation.DEP.Enable) {"Enabled"} else {"Default"}
-                ASLR = if($systemMitigation.ASLR.ForceRelocateImages) {"Force Enabled"} elseif($systemMitigation.ASLR.RequireInfo) {"Enabled"} else {"Default"}
-                CFG = if($systemMitigation.CFG.Enable) {"Enabled"} else {"Default"}
-                SEHOP = if($systemMitigation.SEHOP.Enable) {"Enabled"} else {"Default"}
-                BottomUp = if($systemMitigation.ASLR.BottomUp) {"Enabled"} else {"Default"}
-                HighEntropy = if($systemMitigation.ASLR.HighEntropy) {"Enabled"} else {"Default"}
-            }
-        }
-        
-        # Check common critical processes
-        $criticalProcesses = @("explorer.exe", "winlogon.exe", "lsass.exe", "services.exe")
-        foreach($process in $criticalProcesses) {
-            try {
-                $processMitigation = Get-ProcessMitigation -Name $process -ErrorAction SilentlyContinue
-                if($processMitigation) {                    $exploitSettings += [PSCustomObject]@{
-                        Process = $process
-                        DEP = if($processMitigation.DEP.Enable) {"Enabled"} else {"Default"}
-                        ASLR = if($processMitigation.ASLR.ForceRelocateImages) {"Force Enabled"} elseif($processMitigation.ASLR.RequireInfo) {"Enabled"} else {"Default"}
-                        CFG = if($processMitigation.CFG.Enable) {"Enabled"} else {"Default"}
-                        SEHOP = if($processMitigation.SEHOP.Enable) {"Enabled"} else {"Default"}
-                        BottomUp = if($processMitigation.ASLR.BottomUp) {"Enabled"} else {"Default"}
-                        HighEntropy = if($processMitigation.ASLR.HighEntropy) {"Enabled"} else {"Default"}
-                    }
-                }
-            } catch {
-                # Process may not be running, skip
-            }
-        }
-          if(-not $exploitSettings) {
-            $exploitSettings = [PSCustomObject]@{
-                Process = "No data available"
-            }
-        }
-    } catch {
-        $exploitSettings = [PSCustomObject]@{
-            Process = "Error"
-        }
-    }
-    $exploitSettings | Export-Csv -Path $CsvDefenderExploit -NoTypeInformation
-    $exploitSettingsHtml = $exploitSettings | ConvertTo-Html -Fragment -PreContent "<h2>Exploit Protection Settings</h2>"
-
     Write-Host "Security Information Collection Complete" -ForegroundColor Green
     
     # Return HTML sections
@@ -1329,12 +1279,11 @@ function Get-SecurityInformation {
         'Certificates' = $certificatesHtml
         'DNSSettings' = $dnsSettingsHtml
         'DefenderASR' = $defenderASRHtml
-        'ExploitProtection' = $exploitSettingsHtml
     }
 }
 
 # 3.1 Collect Security Information ===
-$securityInfoHtml = Get-SecurityInformation -Path $path -ServerName $ServerName -GPOSettings $GPOSettings -CsvAVSettings $csvAVsettingsinfo -CsvFWStatusInfo $csvFWstatusinfo -CsvFWSettingsInfo $csvFWSettingsinfo -CsvSMBv1 $csvSMBv1 -CsvInactiveAccountsInfo $csvinactiveaccountsinfo -CsvLocalAdmins $csvlocalAdmins -CsvPasswordPolicyInfo $csvpasswordpolicyinfo -CsvShares $csvShares -CsvAuditSettings $csvauditSettings -CsvTLSregSettings $csvTLSregSettings -CsvUACSettings $csvUACSettings -CsvPSExecPolicy $csvPSExecPolicy -CsvRDPSecurity $csvRDPSecurity -CsvCertificates $csvCertificates -CsvDNSSettings $csvDNSSettings -CsvDefenderASR $csvDefenderASR -CsvDefenderExploit $csvDefenderExploit
+$securityInfoHtml = Get-SecurityInformation -Path $path -ServerName $ServerName -GPOSettings $GPOSettings -CsvAVSettings $csvAVsettingsinfo -CsvFWStatusInfo $csvFWstatusinfo -CsvFWSettingsInfo $csvFWSettingsinfo -CsvSMBv1 $csvSMBv1 -CsvInactiveAccountsInfo $csvinactiveaccountsinfo -CsvLocalAdmins $csvlocalAdmins -CsvPasswordPolicyInfo $csvpasswordpolicyinfo -CsvShares $csvShares -CsvAuditSettings $csvauditSettings -CsvTLSregSettings $csvTLSregSettings -CsvUACSettings $csvUACSettings -CsvPSExecPolicy $csvPSExecPolicy -CsvRDPSecurity $csvRDPSecurity -CsvCertificates $csvCertificates -CsvDNSSettings $csvDNSSettings -CsvDefenderASR $csvDefenderASR
 
 # 3.2 Extract individual HTML sections from security information function
 $AVsettingsHtml = $securityInfoHtml['AntiVirus']
@@ -1353,7 +1302,6 @@ $rdpSecurityHtml = $securityInfoHtml['RDPSecurity']
 $certificatesHtml = $securityInfoHtml['Certificates']
 $dnsSettingsHtml = $securityInfoHtml['DNSSettings']
 $defenderASRHtml = $securityInfoHtml['DefenderASR']
-$exploitSettingsHtml = $securityInfoHtml['ExploitProtection']
 
 } # End security-only or all sections check
 
@@ -1682,11 +1630,11 @@ $reportScope = if ($collectSystemOnly) {
 } elseif ($collectNetworkOnly) { 
     "Network Checks Only (3 sections only)" 
 } elseif ($collectSecurityOnly) { 
-    "Security Checks Only (17 sections only)" 
+    "Security Checks Only (16 sections only)" 
 } elseif ($collectTasksOnly) { 
     "Tasks & Logs Only (3 sections only) " 
 } else { 
-    "Complete Health Check (All Sections - 36 sections)" 
+    "Complete Health Check (All Sections - 35 sections)" 
 }
 
 # Pre-generate all required icons
@@ -2366,7 +2314,7 @@ if ($collectNetworkOnly -or (-not $collectSystemOnly -and -not $collectSecurityO
 }
 
 if ($collectSecurityOnly -or (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectTasksOnly)) {
-    $securitySectionCount = 17
+    $securitySectionCount = 16
     $fullHtml += @"
                 <div class="nav-item has-submenu">
                     <a href="#" data-section="security-info">$iconShield Security Information <span class="section-count">$securitySectionCount</span></a>
@@ -2412,9 +2360,6 @@ if ($collectSecurityOnly -or (-not $collectSystemOnly -and -not $collectNetworkO
                         </div>
                         <div class="nav-submenu-item">
                             <a href="#" data-section="security-info" data-subsection="defender-asr">$iconShield Defender ASR</a>
-                        </div>
-                        <div class="nav-submenu-item">
-                            <a href="#" data-section="security-info" data-subsection="exploit-protection">$iconShield Exploit Protection</a>
                         </div>
                         <div class="nav-submenu-item">
                             <a href="#" data-section="security-info" data-subsection="shares">$iconFolder SMB Shares</a>
@@ -2831,15 +2776,6 @@ if ($collectSecurityOnly -or (-not $collectSystemOnly -and -not $collectNetworkO
                         </div>
                     </div>
                     
-                    <div id="exploit-protection" class="subsection">
-                        <div class="subsection-header">
-                            <h3>$iconShield Exploit Protection</h3>
-                        </div>
-                        <div class="subsection-content">
-                            $exploitSettingsHtml
-                        </div>
-                    </div>
-                    
                     <div id="shares" class="subsection">
                         <div class="subsection-header">
                             <h3>$iconFolder SMB Shares</h3>
@@ -3005,7 +2941,6 @@ if ($collectSecurityOnly -or $menuChoice -eq "5") {
     Write-Host "  * Certificates: $csvCertificates" -ForegroundColor Gray
     Write-Host "  * DNS Settings: $csvDNSSettings" -ForegroundColor Gray
     Write-Host "  * Defender ASR Rules: $csvDefenderASR" -ForegroundColor Gray
-    Write-Host "  * Exploit Protection: $csvDefenderExploit" -ForegroundColor Gray
 }
 
 if ($collectTasksOnly -or $menuChoice -eq "5") {
@@ -3026,3 +2961,36 @@ Write-Host "4. Schedule regular health checks for ongoing monitoring" -Foregroun
 
 Write-Host "`nThank you for using the Windows Server Health Check Script!" -ForegroundColor Green
 Write-Host "Script created by Abdullah Zmaili - Version 1.0" -ForegroundColor Gray
+
+# SIG # Begin signature block
+# MIIFiwYJKoZIhvcNAQcCoIIFfDCCBXgCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
+# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU+9OAPvrWtKJi3TTOPqtdVxFj
+# W3WgggMcMIIDGDCCAgCgAwIBAgIQHKHkSZVplbZEXmQNGpo5KjANBgkqhkiG9w0B
+# AQsFADAkMSIwIAYDVQQDDBlBYmR1bGxhaFptYWlsaUNvZGVTaWduaW5nMB4XDTI1
+# MDcxODA3Mzg1OVoXDTI2MDcxODA3NTg1OVowJDEiMCAGA1UEAwwZQWJkdWxsYWha
+# bWFpbGlDb2RlU2lnbmluZzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+# AOONtHMcr1nlykF8FfhMzPISJZIonzgugEU2vajQIUnD5xfyamiBRlfNH30wZjcU
+# Hz0HWLhvH2P7xS6J++2jHr+F05z4YS77nbkBF9pyn31pLKJeO5Avg7+Jzbcaw7ox
+# Z/hL3iM2AY67TrF/iNPJ/tf75YukWyBR7BN6+uKft0C3EW+bl9mZRYDFOy7bNpbi
+# 8l7Vt70n7Rsmo7zWnjxEO4NIzkexQk+69mVXt+Z2IfFuqDcphY0ZSbMpfPsOaEZu
+# 3gzqw/y5YnWkvEBuPRCFx6MsjcYlx+xu0D+l2cIkuZ2qtytaDCzBjF4YXrnGpjlV
+# d4XwNIYALwOFOMhpvJnP/9kCAwEAAaNGMEQwDgYDVR0PAQH/BAQDAgeAMBMGA1Ud
+# JQQMMAoGCCsGAQUFBwMDMB0GA1UdDgQWBBTGfLNnWQCNSGf/f/Z1/FQboXykijAN
+# BgkqhkiG9w0BAQsFAAOCAQEAIMgd4oUMnvkRaqN3cpEgDI1hCzQ8PnoJqQBk2GfE
+# 1AzSAvDwyAPn3YkypRKzCQxmW8Yf7uxL0eCSA6j3ROavclIk5GWT1grFPbk6EnOX
+# lVyripBDV6+6KyqRSupgGxRCQOgp0vkac0IQV06ncpB2+HuTDMLbskhWWOdCJ7AW
+# Hamp472+fFmOzK4eSqHV6ccfpKxx3f8VG/2FxQX+cKYAioPg+QSEwC3ORAgN5f1P
+# InCDxxhJGb9GcR1nBCAPUmfSgpl1nIazvoQeal/Ncgs8K10oMEGxVJgyB+YKediL
+# KSAnTjY3SwwQaSK/cQ/64QYz0JvFmaLKQ1xf8NuLueTqKDGCAdkwggHVAgEBMDgw
+# JDEiMCAGA1UEAwwZQWJkdWxsYWhabWFpbGlDb2RlU2lnbmluZwIQHKHkSZVplbZE
+# XmQNGpo5KjAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAigAoAAoQKAADAZ
+# BgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgELMQ4wDAYKKwYB
+# BAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUjqAzJ3+o97BmABdXz3XRBIIpcaYwDQYJ
+# KoZIhvcNAQEBBQAEggEA1F/9W87MWcem194CNaIryNlFr9MWWQuHynMWNMTvH4jP
+# 1OKxS8wH7SGOyMx2SHCjBm8XegKSQgv74yAulOOtRBk118eHDW9E69+fZbOauzPw
+# CdP7E94B+OTF2LBVCK6RC2QM+ulAye/a0N6JbQApOM5+jdaPP3XYIQYyPcSwvqR7
+# tnA1u8GtE7kf9NmcraAzhFz2yqonvgTFehsusIv69w6xFjtQUisyNO6mhV5jvgSu
+# CU0SxxCNaZC0gyyGn96EMbs/x5/Tr9G5bT22orI3h+hgE9hPwmnOmmhkR4R3RD/Y
+# a900hqRVzuw/dnhSNxJhnoFZjJl0FCaBdYM6VA2pig==
+# SIG # End signature block
