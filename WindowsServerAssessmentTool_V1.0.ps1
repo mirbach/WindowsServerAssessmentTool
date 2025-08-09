@@ -12,8 +12,11 @@
     Prerequisite   : PowerShell 5.1 or later, Administrator privileges for some checks
 #>
 
-# === Prompt user for the directory to save the files ===
-$path = Read-Host "Enter the full path (without filename) to save the reports (e.g., C:\temp)"
+param(
+    [string]$path = "C:\temp",
+    [ValidateSet("1","2","3","4","5")]
+    [string]$menuChoice = "5"
+)
 
 # === Create directory if it doesn't exist ===
 if (-not (Test-Path -Path $path)) {
@@ -41,7 +44,6 @@ $csvosinfo = Join-Path -Path $path -ChildPath "$ServerName-OSInfo.csv"
 $csvupdatesinstalledinfo = Join-Path -Path $path -ChildPath "$ServerName-UpdatesInstalledInfo.csv"
 $csvinactiveaccountsinfo = Join-Path -Path $path -ChildPath "$ServerName-InactiveAccountsInfo.csv"
 $csvlocalAdmins = Join-Path -Path $path -ChildPath "$ServerName-LocalAdmins.csv"
-$csvpasswordpolicyinfo = Join-Path -Path $path -ChildPath "$ServerName-PasswordPolicyInfo.csv"
 $csvuptimeinfo = Join-Path -Path $path -ChildPath "$ServerName-UpTime.csv"
 $csvmissingupdatesinfo  = Join-Path -Path $path -ChildPath "$ServerName-MissingUpdates.csv"
 $csveventlog = Join-Path -Path $path -ChildPath "$ServerName-EventViewerLogs.csv"
@@ -64,45 +66,18 @@ $csvDNSSettings = Join-Path -Path $path -ChildPath "$ServerName-DNSSettings.csv"
 $csvDefenderASR = Join-Path -Path $path -ChildPath "$ServerName-DefenderASR.csv"
 
 # ----------------------------
-# MENU SELECTION
+# MENU SELECTION (PARAMETERIZED)
 # ----------------------------
 
 Write-Host "`n=== SYSTEM HEALTH CHECK MENU ===" -ForegroundColor Cyan
-Write-Host "Please select the scope of information to collect:" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "1. SYSTEM INFORMATION ONLY" -ForegroundColor Green
-Write-Host "   - OS Details, CPU, Memory, Disk Information" -ForegroundColor Gray
-Write-Host "   - Windows Features, Services, Programs" -ForegroundColor Gray
-Write-Host "   - Updates and Processes" -ForegroundColor Gray
-Write-Host ""
-Write-Host "2. NETWORK CHECKS ONLY" -ForegroundColor Green
-Write-Host "   - Network Interface Configuration" -ForegroundColor Gray
-Write-Host "   - Traffic Statistics and Performance" -ForegroundColor Gray
-Write-Host "   - Open Ports and Connections" -ForegroundColor Gray
-Write-Host ""
-Write-Host "3. SECURITY CHECKS ONLY" -ForegroundColor Green
-Write-Host "   - Antivirus and Firewall Settings" -ForegroundColor Gray
-Write-Host "   - User Accounts and Password Policies" -ForegroundColor Gray
-Write-Host "   - Security Configurations and Certificates" -ForegroundColor Gray
-Write-Host ""
-Write-Host "4. SCHEDULED TASKS & STARTUP & LOGS ONLY" -ForegroundColor Green
-Write-Host "   - Startup Programs and Services" -ForegroundColor Gray
-Write-Host "   - Scheduled Tasks Configuration" -ForegroundColor Gray
-Write-Host "   - System, Application & Security Event Logs" -ForegroundColor Gray
-Write-Host ""
-Write-Host "5. ALL SECTIONS (Complete Health Check)" -ForegroundColor Green
-Write-Host "   - System Information" -ForegroundColor Gray
-Write-Host "   - Network Information" -ForegroundColor Gray
-Write-Host "   - Security Information" -ForegroundColor Gray
-Write-Host "   - Scheduled Tasks, Startup Programs, and Logs Information" -ForegroundColor Gray
-Write-Host ""
-
-do {
-    $menuChoice = Read-Host "Enter your choice (1, 2, 3, 4, or 5)"
-    if ($menuChoice -notin @("1", "2", "3", "4", "5")) {
-        Write-Host "Invalid choice. Please enter 1, 2, 3, 4, or 5." -ForegroundColor Red
-    }
-} while ($menuChoice -notin @("1", "2", "3", "4", "5"))
+Write-Host "Selected scope: $menuChoice" -ForegroundColor Yellow
+switch ($menuChoice) {
+    "1" { Write-Host "SYSTEM INFORMATION ONLY" -ForegroundColor Green }
+    "2" { Write-Host "NETWORK CHECKS ONLY" -ForegroundColor Green }
+    "3" { Write-Host "SECURITY CHECKS ONLY" -ForegroundColor Green }
+    "4" { Write-Host "SCHEDULED TASKS & STARTUP & LOGS ONLY" -ForegroundColor Green }
+    "5" { Write-Host "ALL SECTIONS (Complete Health Check)" -ForegroundColor Green }
+}
 
 $collectSystemOnly = ($menuChoice -eq "1")
 $collectNetworkOnly = ($menuChoice -eq "2")
@@ -110,22 +85,16 @@ $collectSecurityOnly = ($menuChoice -eq "3")
 $collectTasksOnly = ($menuChoice -eq "4")
 
 if ($collectSystemOnly) {
-    Write-Host "`nYou selected: SYSTEM INFORMATION ONLY" -ForegroundColor Green
     Write-Host "The script will collect only system-related information." -ForegroundColor Yellow
 } elseif ($collectNetworkOnly) {
-    Write-Host "`nYou selected: NETWORK CHECKS ONLY" -ForegroundColor Green
     Write-Host "The script will collect only network-related information." -ForegroundColor Yellow
 } elseif ($collectSecurityOnly) {
-    Write-Host "`nYou selected: SECURITY CHECKS ONLY" -ForegroundColor Green
     Write-Host "The script will collect only security-related information." -ForegroundColor Yellow
 } elseif ($collectTasksOnly) {
-    Write-Host "`nYou selected: SCHEDULED TASKS & STARTUP & LOGS ONLY" -ForegroundColor Green
     Write-Host "The script will collect only tasks, startup programs, and logs information." -ForegroundColor Yellow
 } else {
-    Write-Host "`nYou selected: ALL SECTIONS (Complete Health Check)" -ForegroundColor Green
     Write-Host "The script will collect comprehensive system health information." -ForegroundColor Yellow
 }
-
 Write-Host "`nStarting data collection..." -ForegroundColor Cyan
 Start-Sleep -Seconds 2
 
@@ -242,6 +211,9 @@ function Get-SystemInformation {
         "InstalledUpdates" = ""
         "MissingUpdates" = ""
     }      # === OS Details ===
+        # Add User Rights Assignments section to HTML sections
+        $htmlSections["UserRightsAssignments"] = ""
+$csvUserRightsAssignments = Join-Path -Path $path -ChildPath "$ServerName-UserRightsAssignments.csv"
     Write-Host "Collecting OS Details..." -ForegroundColor Yellow
     try {
         $osInfoRaw = Get-ComputerInfo | Select-Object OsName, OsArchitecture, CsName, OsVersion, OsBuildNumber, WindowsInstallationType, WindowsInstallDateFromRegistry
@@ -459,6 +431,28 @@ function Get-SystemInformation {
         Write-Warning "Failed to collect Windows Services: $($_.Exception.Message)"
         $htmlSections['RunningServices'] = "<h2>Running Windows Services</h2><p>Error collecting running services</p>"
         $htmlSections['StoppedServices'] = "<h2>Stopped Windows Services</h2><p>Error collecting stopped services</p>"
+        }
+        # === User Rights Assignments ===
+        Write-Host "Collecting User Rights Assignments..." -ForegroundColor Yellow
+        try {
+            $tempInf = Join-Path -Path $env:TEMP -ChildPath "UserRightsAssignments.inf"
+            secedit /export /cfg $tempInf /areas USER_RIGHTS | Out-Null
+            $userRightsRaw = Select-String -Path $tempInf -Pattern "^Se.* = .+" | ForEach-Object {
+                $line = $_.Line
+                $parts = $line -split " = "
+                [PSCustomObject]@{
+                    "Privilege" = $parts[0]
+                    "AssignedTo" = $parts[1]
+                }
+            }
+            $userRightsRaw | Export-Csv -Path $csvUserRightsAssignments -NoTypeInformation
+            $htmlSections['UserRightsAssignments'] = $userRightsRaw | ConvertTo-Html -Fragment -PreContent "<h2>User Rights Assignments</h2>"
+            Write-Host "User Rights Assignments - Completed" -ForegroundColor Green
+            Remove-Item $tempInf -ErrorAction SilentlyContinue
+        } catch {
+            Write-Warning "Failed to collect User Rights Assignments: $($_.Exception.Message)"
+            $htmlSections['UserRightsAssignments'] = "<h2>User Rights Assignments</h2><p>Error collecting User Rights Assignments</p>"
+        }
     }    # === Installed Programs ===
     Write-Host "Collecting Installed Programs..." -ForegroundColor Yellow
     try {
@@ -586,9 +580,9 @@ function Get-SystemInformation {
     }
 
     Write-Host "=== SYSTEM INFORMATION COLLECTION COMPLETED ===" -ForegroundColor Green
-    
+
     return $htmlSections
-}
+
 
 # Check if user selected to collect system information (system-only or all sections)
 if ($collectSystemOnly -or (-not $collectNetworkOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly)) {
@@ -612,6 +606,7 @@ $updatesHtml = $systemInfoHtml['InstalledUpdates']
 $missingupdatesHtml = $systemInfoHtml['MissingUpdates']
 
 } # End system information collection
+
 
 # Check if user selected to collect network or all sections
 if ($collectNetworkOnly -or (-not $collectSystemOnly -and -not $collectSecurityOnly -and -not $collectTasksOnly)) {
@@ -757,7 +752,7 @@ function Get-SecurityInformation {
         [string]$CsvSMBv1,
         [string]$CsvInactiveAccountsInfo,
         [string]$CsvLocalAdmins,
-        [string]$CsvPasswordPolicyInfo,
+    [string]$CsvAccountPolicyPath,
         [string]$CsvShares,
         [string]$CsvAuditSettings,
         [string]$CsvTLSregSettings,
@@ -844,7 +839,7 @@ function Get-SecurityInformation {
         "Force Logoff" = $forcelogoff
     }
 
-    $passwordPolicy | Export-Csv -Path $CsvPasswordPolicyInfo -NoTypeInformation
+    $passwordPolicy | Export-Csv -Path $CsvAccountPolicyPath -NoTypeInformation
     $passwordPolicyHtml = $passwordPolicy | ConvertTo-Html -Fragment -PreContent "<h2>Password Policy Details</h2>"    # === SMB Shares ===
     Write-Host "Collecting SMB Shares..." -ForegroundColor Yellow
     $sharesRaw = Get-SmbShare | Select-Object ShareType, FolderEnumerationMode, Description, Name, Path, ShadowCopy, Volume
@@ -1260,30 +1255,30 @@ function Get-SecurityInformation {
     $defenderASRHtml = $defenderASR | ConvertTo-Html -Fragment -PreContent "<h2>Windows Defender Attack Surface Reduction (ASR) & Exploit Guard</h2>"
 
     Write-Host "Security Information Collection Complete" -ForegroundColor Green
-    
+
     # Return HTML sections
-    return @{
-        'AntiVirus' = $AVsettingsHtml
-        'FirewallStatus' = $FWstatusHtml
-        'FirewallSettings' = $FWSettingsHtml
-        'SMBv1Status' = $SMBv1Html
-        'InactiveAccounts' = $inactiveAccountsHtml
-        'LocalAdmins' = $localAdminsHtml
-        'PasswordPolicy' = $passwordPolicyHtml
-        'SMBShares' = $sharesHtml
-        'AuditSettings' = $auditSettingsHtml
-        'TLSSettings' = $TLSregSettingsHtml
-        'UACSettings' = $uacHtml
-        'PSExecutionPolicy' = $psExecPolicyHtml
-        'RDPSecurity' = $rdpSecurityHtml
-        'Certificates' = $certificatesHtml
-        'DNSSettings' = $dnsSettingsHtml
-        'DefenderASR' = $defenderASRHtml
-    }
+    $sections = [ordered]@{}
+    $sections['AntiVirus'] = $AVsettingsHtml
+    $sections['FirewallStatus'] = $FWstatusHtml
+    $sections['FirewallSettings'] = $FWSettingsHtml
+    $sections['SMBv1Status'] = $SMBv1Html
+    $sections['InactiveAccounts'] = $inactiveAccountsHtml
+    $sections['LocalAdmins'] = $localAdminsHtml
+    $sections['PasswordPolicy'] = $passwordPolicyHtml
+    $sections['SMBShares'] = $sharesHtml
+    $sections['AuditSettings'] = $auditSettingsHtml
+    $sections['TLSSettings'] = $TLSregSettingsHtml
+    $sections['UACSettings'] = $uacHtml
+    $sections['PSExecutionPolicy'] = $psExecPolicyHtml
+    $sections['RDPSecurity'] = $rdpSecurityHtml
+    $sections['Certificates'] = $certificatesHtml
+    $sections['DNSSettings'] = $dnsSettingsHtml
+    $sections['DefenderASR'] = $defenderASRHtml
+    return $sections
 }
 
 # 3.1 Collect Security Information ===
-$securityInfoHtml = Get-SecurityInformation -Path $path -ServerName $ServerName -GPOSettings $GPOSettings -CsvAVSettings $csvAVsettingsinfo -CsvFWStatusInfo $csvFWstatusinfo -CsvFWSettingsInfo $csvFWSettingsinfo -CsvSMBv1 $csvSMBv1 -CsvInactiveAccountsInfo $csvinactiveaccountsinfo -CsvLocalAdmins $csvlocalAdmins -CsvPasswordPolicyInfo $csvpasswordpolicyinfo -CsvShares $csvShares -CsvAuditSettings $csvauditSettings -CsvTLSregSettings $csvTLSregSettings -CsvUACSettings $csvUACSettings -CsvPSExecPolicy $csvPSExecPolicy -CsvRDPSecurity $csvRDPSecurity -CsvCertificates $csvCertificates -CsvDNSSettings $csvDNSSettings -CsvDefenderASR $csvDefenderASR
+$securityInfoHtml = Get-SecurityInformation -Path $path -ServerName $ServerName -GPOSettings $GPOSettings -CsvAVSettings $csvAVsettingsinfo -CsvFWStatusInfo $csvFWstatusinfo -CsvFWSettingsInfo $csvFWSettingsinfo -CsvSMBv1 $csvSMBv1 -CsvInactiveAccountsInfo $csvinactiveaccountsinfo -CsvLocalAdmins $csvlocalAdmins -CsvAccountPolicyPath (Join-Path -Path $path -ChildPath "$ServerName-PasswordPolicyInfo.csv") -CsvShares $csvShares -CsvAuditSettings $csvauditSettings -CsvTLSregSettings $csvTLSregSettings -CsvUACSettings $csvUACSettings -CsvPSExecPolicy $csvPSExecPolicy -CsvRDPSecurity $csvRDPSecurity -CsvCertificates $csvCertificates -CsvDNSSettings $csvDNSSettings -CsvDefenderASR $csvDefenderASR
 
 # 3.2 Extract individual HTML sections from security information function
 $AVsettingsHtml = $securityInfoHtml['AntiVirus']
@@ -1304,9 +1299,6 @@ $dnsSettingsHtml = $securityInfoHtml['DNSSettings']
 $defenderASRHtml = $securityInfoHtml['DefenderASR']
 
 } # End security-only or all sections check
-
-# Check if user selected to collect tasks and logs sections (tasks-only or all sections mode)
-if ($collectTasksOnly -or (-not $collectSystemOnly -and -not $collectNetworkOnly -and -not $collectSecurityOnly)) {
 
 # ----------------------------
 # 4. SCHEDULED TASKS & STARTUP & LOGS
@@ -1465,7 +1457,6 @@ $startupprogsHtml = $tasksStartupLogsInfoHtml['StartupPrograms']
 $ScheduledTasksHtml = $tasksStartupLogsInfoHtml['ScheduledTasks']
 $eventlogHtml = $tasksStartupLogsInfoHtml['EventLogDetails']
 
-} # End tasks and logs section
 
 # Initialize empty variables for sections not collected based on user selection
 if ($collectSystemOnly) {
@@ -1493,7 +1484,6 @@ if ($collectSystemOnly) {
     $certificatesHtml = ""
     $dnsSettingsHtml = ""
     $defenderASRHtml = ""
-    $exploitSettingsHtml = ""
     $startupprogsHtml = ""
     $ScheduledTasksHtml = ""
     $eventlogHtml = ""
@@ -1530,7 +1520,6 @@ if ($collectSystemOnly) {
     $certificatesHtml = ""
     $dnsSettingsHtml = ""
     $defenderASRHtml = ""
-    $exploitSettingsHtml = ""
     $startupprogsHtml = ""
     $ScheduledTasksHtml = ""
     $eventlogHtml = ""
@@ -1571,7 +1560,6 @@ elseif ($collectTasksOnly) {
     $certificatesHtml = ""
     $dnsSettingsHtml = ""
     $defenderASRHtml = ""
-    $exploitSettingsHtml = ""
 } elseif ($collectSecurityOnly) {
     Write-Host "=== SKIPPING SYSTEM, NETWORK & TASKS SECTIONS (Security Checks Only Mode) ===" -ForegroundColor Yellow
     
@@ -2858,9 +2846,11 @@ $fullHtml += @"
                 Abdullah Zmaili
             </div>
             <div class="footer-item">
-                <strong>Server Assessed:</strong><br>                $(hostname)
+                <strong>Server Assessed:</strong><br>
+                $(hostname)
             </div>
-        </div>    </div>
+        </div>
+    </div>
     
 </body>
 </html>
@@ -2931,7 +2921,7 @@ if ($collectSecurityOnly -or $menuChoice -eq "5") {
     Write-Host "  * SMBv1 Status: $csvSMBv1" -ForegroundColor Gray
     Write-Host "  * Inactive Accounts: $csvinactiveaccountsinfo" -ForegroundColor Gray
     Write-Host "  * Local Administrators: $csvlocalAdmins" -ForegroundColor Gray
-    Write-Host "  * Password Policy: $csvpasswordpolicyinfo" -ForegroundColor Gray
+    Write-Host "  * Password Policy: $(Join-Path -Path $path -ChildPath "$ServerName-PasswordPolicyInfo.csv")" -ForegroundColor Gray
     Write-Host "  * SMB Shares: $csvShares" -ForegroundColor Gray
     Write-Host "  * Audit Settings: $csvauditSettings" -ForegroundColor Gray
     Write-Host "  * TLS Registry Settings: $csvTLSregSettings" -ForegroundColor Gray
