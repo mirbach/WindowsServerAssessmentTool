@@ -33,6 +33,7 @@ Invoke-WindowsServerAssessment -ComputerName srv1,srv2 -MenuChoice 5 -OutputRoot
 
 .NOTES
 Requires WinRM remoting enabled on targets and network/firewall access.
+# LAPS support: Use -UseLaps to authenticate with Local Administrator Password Solution passwords per target. Requires the 'LAPS' (Windows LAPS) or 'AdmPwd.PS' (legacy) module and read permissions.
 #>
 [CmdletBinding()]
 param(
@@ -57,7 +58,15 @@ param(
     [switch]$UseSSL,
 
     [Parameter()]
-    [int]$Port
+    [int]$Port,
+
+    # Use LAPS credentials when connecting (retrieved per target)
+    [Parameter()]
+    [switch]$UseLaps,
+
+    # Optional override for the local admin account name if the LAPS policy uses a non-default name (otherwise the account name from Windows LAPS will be used, or 'Administrator' for legacy LAPS)
+    [Parameter()]
+    [string]$LapsAccountName
 )
 
 begin {
@@ -85,6 +94,43 @@ begin {
     $jobs = @()
     $sessionMap = @{}
     $tempName = ('WSAT_{0:yyyyMMdd_HHmmss}_{1}' -f (Get-Date), [System.Guid]::NewGuid().ToString('N'))
+
+    function Get-TargetLapsCredential {
+        param(
+            [Parameter(Mandatory)][string]$ComputerName,
+            [string]$AccountOverride
+        )
+        # Try Windows LAPS first (Get-LapsADPassword)
+        $lapsAD = Get-Command -Name Get-LapsADPassword -ErrorAction SilentlyContinue
+        if ($lapsAD) {
+            try {
+                $res = Get-LapsADPassword -ComputerName $ComputerName -AsPlainText -IncludePassword -ErrorAction Stop
+                if ($res) {
+                    $pwdPlain = [string]$res.Password
+                    $acctName = if ($res.Account) { [string]$res.Account } elseif ($AccountOverride) { [string]$AccountOverride } else { 'Administrator' }
+                    $sec = ConvertTo-SecureString -String $pwdPlain -AsPlainText -Force
+                    # Use "ComputerName\User" form for local account auth over WinRM
+                    $user = ("{0}\\{1}" -f $ComputerName, $acctName)
+                    return [PSCredential]::new($user, $sec)
+                }
+            } catch {}
+        }
+        # Legacy LAPS (AdmPwd.PS)
+        $legacy = Get-Command -Name Get-AdmPwdPassword -ErrorAction SilentlyContinue
+        if ($legacy) {
+            try {
+                $res = Get-AdmPwdPassword -ComputerName $ComputerName -ErrorAction Stop
+                if ($res) {
+                    $pwdPlain = [string]$res.Password
+                    $acctName = if ($AccountOverride) { [string]$AccountOverride } else { 'Administrator' }
+                    $sec = ConvertTo-SecureString -String $pwdPlain -AsPlainText -Force
+                    $user = ("{0}\\{1}" -f $ComputerName, $acctName)
+                    return [PSCredential]::new($user, $sec)
+                }
+            } catch {}
+        }
+        throw "Failed to retrieve LAPS password for $ComputerName. Ensure LAPS module is installed and you have read permissions."
+    }
 }
 
 process {
@@ -103,6 +149,14 @@ process {
                 ErrorAction    = 'Stop'
             }
             if ($Credential) { $splat.Credential = $Credential }
+            elseif ($UseLaps) {
+                try {
+                    $lapsCred = Get-TargetLapsCredential -ComputerName $cn -AccountOverride $LapsAccountName
+                    $splat.Credential = $lapsCred
+                } catch {
+                    Write-Warning "[$cn] LAPS credential retrieval failed: $($_.Exception.Message)"; throw
+                }
+            }
             $session = New-PSSession @splat
             $sessionMap[$cn] = [PSCustomObject]@{
                 Session       = $session

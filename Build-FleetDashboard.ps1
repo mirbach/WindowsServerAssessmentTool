@@ -83,11 +83,142 @@ function Any-RowContains {
     return $false
 }
 
+function Row-ToMap {
+    param([psobject]$row)
+    $map = [ordered]@{}
+    if ($null -eq $row) { return $map }
+    foreach ($prop in $row.PSObject.Properties) {
+        $name = [string]$prop.Name
+        if (-not $name) { continue }
+        $val = [string]$prop.Value
+        if ($null -eq $val -or $val -eq '') { continue }
+        $map[$name] = $val
+    }
+    return $map
+}
+
 if (-not (Test-Path -LiteralPath $RootPath)) {
     throw "RootPath not found: $RootPath"
 }
 
 $fleet = @()
+$msBaselinePath = Join-Path -Path (Split-Path -Parent $MyInvocation.MyCommand.Path) -ChildPath 'MSFT Windows Server 2022 - Domain Controller.json'
+
+function Build-MsBaseline {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try {
+        $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+        $doc = $raw | ConvertFrom-Json -ErrorAction Stop
+    } catch { return $null }
+
+    $obj = [ordered]@{
+        server = 'Microsoft Security Baseline'
+        tls = $null; tlsDetails = $null
+        uacEnabled = $null; uacDetails = $null
+        rdpNlaEnabled = $null; rdpDetails = $null
+        smb1Enabled = $null
+        userRights = $null; userRightsFull = $null
+        audit = $null
+        execPolicy = $null; execDetails = $null
+    }
+
+    $maps = @($doc.Mappings)
+    if (-not $maps) { return [pscustomobject]$obj }
+
+    # TLS via Registry entries
+    $tlsMap = @{}
+    $tlsDetails = [ordered]@{}
+    foreach ($m in $maps) {
+        if ($m.DSCResource -ne 'Registry') { continue }
+        $path = [string]$m.RegistryPath
+        $valueName = [string]$m.RegistryValue
+        $rec = [string]$m.RecommendedValue
+        if (-not $path -or -not $valueName) { continue }
+        if ($path -match 'SCHANNEL\\Protocols\\(TLS 1\.0|TLS 1\.1|TLS 1\.2|SSL 3\.0)\\Server') {
+            $proto = $Matches[1]
+            if ($valueName -ieq 'Enabled') {
+                $on = $false
+                if ($rec -match '^(1|Enabled|On|True)$') { $on = $true }
+                elseif ($rec -match '^(0|Disabled|Off|False)$') { $on = $false }
+                $tlsMap[$proto] = $on
+            }
+        }
+    }
+    if ($tlsMap.Count -gt 0) {
+        $tls10 = $false; if ($tlsMap.ContainsKey('TLS 1.0')) { $tls10 = [bool]$tlsMap['TLS 1.0'] }
+        $tls11 = $false; if ($tlsMap.ContainsKey('TLS 1.1')) { $tls11 = [bool]$tlsMap['TLS 1.1'] }
+        $tls12 = $null; if ($tlsMap.ContainsKey('TLS 1.2')) { $tls12 = [bool]$tlsMap['TLS 1.2'] }
+        $ssl3  = $false; if ($tlsMap.ContainsKey('SSL 3.0')) { $ssl3  = [bool]$tlsMap['SSL 3.0'] }
+        $obj.tls = [ordered]@{ tls10=$tls10; tls11=$tls11; tls12=$tls12; ssl3=$ssl3 }
+        $obj.tlsDetails = [ordered]@{ 'TLS 1.0'=$tls10; 'TLS 1.1'=$tls11; 'TLS 1.2'=$tls12; 'SSL 3'=$ssl3 }
+    }
+
+    # User Rights Assignments
+    $urFull = @{}
+    foreach ($m in $maps) {
+        if ($m.DSCResource -ne 'UserRightsAssignment') { continue }
+        $priv = [string]$m.Parameter
+        if (-not $priv) { $priv = [string]$m.Title }
+        if (-not $priv) { continue }
+        $reco = [string]$m.RecommendedValue
+        $principals = @()
+        if ($reco) { $principals = ($reco -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ } }
+        if (-not $urFull.ContainsKey($priv)) { $urFull[$priv] = New-Object System.Collections.ArrayList }
+        foreach ($p in $principals) { if (-not ($urFull[$priv] -contains $p)) { [void]$urFull[$priv].Add($p) } }
+    }
+    if ($urFull.Count -gt 0) {
+        $obj.userRightsFull = $urFull
+        $uraFlags = [ordered]@{ rdpAllowEveryone=$false; rdpAllowDomainUsers=$false }
+        if ($urFull.ContainsKey('SeRemoteInteractiveLogonRight')) {
+            $vals = @($urFull['SeRemoteInteractiveLogonRight'])
+            $uraFlags.rdpAllowEveryone = ($vals -match 'Everyone').Count -gt 0
+            $uraFlags.rdpAllowDomainUsers = ($vals -match 'Domain Users').Count -gt 0
+        }
+        $obj.userRights = $uraFlags
+    }
+
+    # Audit policies
+    $audit = [ordered]@{}
+    foreach ($m in $maps) {
+        if ($m.DSCResource -ne 'AuditPolicySubcategory') { continue }
+        $name = [string]$m.Title
+        $val = [string]$m.RecommendedValue
+        if ($name) { $audit[$name] = $val }
+    }
+    if ($audit.Count -gt 0) { $obj.audit = $audit }
+
+    # UAC and RDP via Security Options
+    $uacMap = [ordered]@{}
+    foreach ($m in $maps) {
+        if ($m.DSCResource -ne 'SecurityOption') { continue }
+        $title = [string]$m.Title
+        $val = [string]$m.RecommendedValue
+        if (-not $title) { continue }
+        $uacMap[$title] = $val
+        if ($title -match 'User\s*Account\s*Control' -or $title -match 'UAC') {
+            if ($val -match 'Enabled|On|1|True') { $obj.uacEnabled = $true } elseif ($val -match 'Disabled|Off|0|False') { $obj.uacEnabled = $false }
+        }
+        if ($title -match 'Network Level Authentication' -or $title -match 'Require user authentication for remote connections') {
+            if ($val -match 'Enabled|On|1|True') { $obj.rdpNlaEnabled = $true } elseif ($val -match 'Disabled|Off|0|False') { $obj.rdpNlaEnabled = $false }
+        }
+    }
+    if ($uacMap.Count -gt 0) { $obj.uacDetails = $uacMap }
+
+    # SMBv1 via Registry
+    foreach ($m in $maps) {
+        if ($m.DSCResource -ne 'Registry') { continue }
+        $path = [string]$m.RegistryPath
+        $valueName = [string]$m.RegistryValue
+        $rec = [string]$m.RecommendedValue
+        if ($path -match 'SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters' -and $valueName -match 'SMB1') {
+            if ($rec -match '^(0|Disabled|Off|False)$') { $obj.smb1Enabled = $false }
+            elseif ($rec -match '^(1|Enabled|On|True)$') { $obj.smb1Enabled = $true }
+        }
+    }
+
+    return [pscustomobject]$obj
+}
 $hostDirs = Get-ChildItem -LiteralPath $RootPath -Directory -ErrorAction SilentlyContinue | Sort-Object Name
 foreach ($dir in $hostDirs) {
     $server = $dir.Name
@@ -134,14 +265,22 @@ foreach ($dir in $hostDirs) {
     $muCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-MissingUpdates.csv'
     $muCount = 0
     $muSize = 0.0
+    $muDetails = @()
     if ($muCsv) {
         $muCount = ($muCsv | Measure-Object).Count
         $muSize = Sum-SizeMB -rows $muCsv -columnName 'Size (MB)'
+        foreach ($row in $muCsv) {
+            $title = [string](Get-FirstValueByNames -row $row -names @('Missing Windows Update','Title','Update'))
+            $kb = [string](Get-FirstValueByNames -row $row -names @('KB','KBs','KBArticleIDs'))
+            if ($title -and $kb) { $muDetails += ("$title (" + $kb + ")") }
+            elseif ($title) { $muDetails += $title }
+        }
     }
 
     # Firewall
     $fwCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-FirewallStatus.csv'
     $fwDom = $false; $fwPriv = $false; $fwPub = $false
+    $fwDetails = [ordered]@{ domain=$fwDom; private=$fwPriv; public=$fwPub }
     if ($fwCsv) {
         foreach ($row in $fwCsv) {
             $p = [string]$row.Profile
@@ -152,16 +291,19 @@ foreach ($dir in $hostDirs) {
                 'Public' { $fwPub = $en }
             }
         }
+        $fwDetails = [ordered]@{ domain=$fwDom; private=$fwPriv; public=$fwPub }
     }
 
     # RDP security
     $rdpCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-RDPSecurity.csv'
     $rdpNla = $true
+    $rdpDetails = [ordered]@{}
     if ($rdpCsv) {
         $r = $rdpCsv | Select-Object -First 1
         if ($r) {
             $nla = [string]$r.'Network Level Authentication'
             if ($nla -match 'Disabled') { $rdpNla = $false } else { $rdpNla = $true }
+            $rdpDetails = Row-ToMap $r
         }
     }
 
@@ -189,11 +331,13 @@ foreach ($dir in $hostDirs) {
     # AV / Defender status
     $avCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-AVSettings.csv'
     $avRealTime = $null; $avEngine = ''
+    $avDetails = [ordered]@{}
     if ($avCsv) {
         $avr = $avCsv | Select-Object -First 1
         $rtVal = Get-FirstValueByNames -row $avr -names @('RealTimeProtectionEnabled','RealtimeProtection','RealtimeProtectionEnabled','AMServiceEnabled','AntivirusEnabled')
         if ($null -ne $rtVal) { $avRealTime = To-Bool $rtVal }
         $avEngine = [string](Get-FirstValueByNames -row $avr -names @('EngineVersion','AntivirusSignatureVersion','SignatureVersion'))
+        $avDetails = Row-ToMap $avr
         if ($avRealTime -eq $false) { $risk += 40 }
     }
 
@@ -238,6 +382,7 @@ foreach ($dir in $hostDirs) {
     # TLS/SSL protocols
     $tlsCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-TLSregSettings.csv'
     $tls10On=$false;$tls11On=$false;$tls12On=$true;$ssl3On=$false
+    $tlsDetails = [ordered]@{}
     if ($tlsCsv) {
         foreach ($row in $tlsCsv) {
             $proto = [string](Get-FirstValueByNames -row $row -names @('Protocol','Name','Key'))
@@ -251,6 +396,7 @@ foreach ($dir in $hostDirs) {
                 'SSL\s*3'     { $ssl3On  = $on }
             }
         }
+        $tlsDetails = [ordered]@{ 'TLS 1.0'=$tls10On; 'TLS 1.1'=$tls11On; 'TLS 1.2'=$tls12On; 'SSL 3'=$ssl3On }
         if ($tls10On) { $risk += 20 }
         if ($tls11On) { $risk += 20 }
         if ($ssl3On)  { $risk += 30 }
@@ -259,19 +405,27 @@ foreach ($dir in $hostDirs) {
     # UAC settings
     $uacCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-UACSettings.csv'
     $uacEnabled = $true
+    $uacDetails = [ordered]@{}
     if ($uacCsv) {
         $ur = $uacCsv | Select-Object -First 1
         $uacVal = Get-FirstValueByNames -row $ur -names @('UAC','EnableLUA','Status','Enabled')
         if ($null -ne $uacVal) { $uacEnabled = To-Bool $uacVal }
+        $uacDetails = Row-ToMap $ur
         if (-not $uacEnabled) { $risk += 30 }
     }
 
     # Execution Policy
     $epCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-PSExecPolicy.csv'
     $execPolicy = ''
+    $execDetails = [ordered]@{}
     if ($epCsv) {
         $epr = $epCsv | Select-Object -First 1
         $execPolicy = [string](Get-FirstValueByNames -row $epr -names @('ExecutionPolicy','Policy','Scope'))
+        foreach ($row in $epCsv) {
+            $scope = [string](Get-FirstValueByNames -row $row -names @('Scope'))
+            $pol = [string](Get-FirstValueByNames -row $row -names @('ExecutionPolicy','Policy'))
+            if ($scope) { $execDetails[$scope] = $pol }
+        }
         if ($execPolicy -match 'Unrestricted|Bypass') { $risk += 20 }
     }
 
@@ -339,10 +493,15 @@ foreach ($dir in $hostDirs) {
     # SMB shares – Everyone permissions indicator if detectable
     $shCsv = Try-ImportCsvFirstMatch -Folder $folder -Pattern '*-SMBShares.csv'
     $shareCount = 0; $shareEveryoneCount = 0
+    $sharesDetails = @()
     if ($shCsv) {
         $shareCount = ($shCsv | Measure-Object).Count
         foreach ($row in $shCsv) {
             if (Any-RowContains -rows @($row) -needle 'Everyone') { $shareEveryoneCount++ }
+            $name = [string](Get-FirstValueByNames -row $row -names @('Name','ShareName'))
+            $path = [string](Get-FirstValueByNames -row $row -names @('Path','Folder','LocalPath'))
+            $everyone = Any-RowContains -rows @($row) -needle 'Everyone'
+            $sharesDetails += [pscustomobject]@{ name=$name; path=$path; everyone=$everyone }
         }
         if ($shareEveryoneCount -gt 0) { $risk += 20 }
     }
@@ -352,17 +511,28 @@ foreach ($dir in $hostDirs) {
     $auditMap = [ordered]@{}
     if ($auditCsv) {
         foreach ($row in $auditCsv) {
-            $setting = [string](Get-FirstValueByNames -row $row -names @('Setting','Policy','Name'))
+            # Prefer structured columns if present
+            $cat = $null; $sub = $null; $set = $null
+            try { $cat = [string]$row.Category } catch {}
+            try { $sub = [string]$row.Subcategory } catch {}
+            try { $set = [string]$row.Setting } catch {}
+            if ($sub -and $set) {
+                $name = $sub.Trim(); $status = $set.Trim()
+                if ($name) { $auditMap[$name] = $status }
+                continue
+            }
+            # Fallback to legacy single-column parsing
+            $setting = [string](Get-FirstValueByNames -row $row -names @('Setting','Policy','Name','SettingText'))
             if (-not $setting) { continue }
             # Skip category header rows where Setting equals Category
-            $cat = [string](Get-FirstValueByNames -row $row -names @('Category'))
-            if ($cat -and $setting -eq $cat) { continue }
+            $catLegacy = [string](Get-FirstValueByNames -row $row -names @('Category'))
+            if ($catLegacy -and $setting -eq $catLegacy) { continue }
             # Expect pattern: "Name<spaces>Status"; take the trailing token(s) after 2+ spaces as status
             $name = $setting; $status = ''
             $m = [regex]::Match($setting, '^(.*?)[\s]{2,}([^\s].*)$')
             if ($m.Success) { $name = $m.Groups[1].Value.Trim(); $status = $m.Groups[2].Value.Trim() }
             if (-not $status) { $status = $name; $name = $setting }
-            if (-not $auditMap.Contains($name)) { $auditMap[$name] = $status } else { $auditMap[$name] = $status }
+            $auditMap[$name] = $status
         }
     }
 
@@ -377,19 +547,27 @@ foreach ($dir in $hostDirs) {
         }
         uptimeHours = $uptimeHours
         missingUpdates = [ordered]@{ count = $muCount; sizeMB = $muSize }
-        firewall = [ordered]@{ domain = $fwDom; private = $fwPriv; public = $fwPub }
+    muDetails = $muDetails
+    firewall = [ordered]@{ domain = $fwDom; private = $fwPriv; public = $fwPub }
+    fwDetails = $fwDetails
         rdpNlaEnabled = $rdpNla
+    rdpDetails = $rdpDetails
         smb1Enabled = $smb1
     av = [ordered]@{ realTime=$avRealTime; engine=$avEngine; asrEnabled=$asrEnabled; asrDisabled=$asrDisabled; asrAudit=$asrAudit; asrConfigured=$asrConfigured; asrTotalPossible=$($knownAsrRules.Count) }
+    avDetails = $avDetails
         tls = [ordered]@{ tls10=$tls10On; tls11=$tls11On; tls12=$tls12On; ssl3=$ssl3On }
-        uacEnabled = $uacEnabled
+    tlsDetails = $tlsDetails
+    uacEnabled = $uacEnabled
+    uacDetails = $uacDetails
         execPolicy = $execPolicy
+    execDetails = $execDetails
         password = [ordered]@{ complexity = $pwdComplex; minLength = $pwdMinLen; lockoutThreshold = $pwdLockout }
         localAdmins = [ordered]@{ count=$localAdminsCount; hasDomainAdmins=$localAdminsHasDomainAdmins }
         userRights = [ordered]@{ rdpAllowEveryone=$rdpAllowEveryone; rdpAllowDomainUsers=$rdpAllowDomainUsers }
     userRightsFull = $userRightsFull
         openPorts = [ordered]@{ total=$openPortsTotal; risky=$openPortsRisky }
-        smbShares = [ordered]@{ total=$shareCount; everyone=$shareEveryoneCount }
+    smbShares = [ordered]@{ total=$shareCount; everyone=$shareEveryoneCount }
+    sharesDetails = $sharesDetails
     audit = $auditMap
         riskScore = $risk
         reportPath = $reportRel
@@ -399,6 +577,8 @@ foreach ($dir in $hostDirs) {
 
 # Save JSON
 $json = $fleet | ConvertTo-Json -Depth 6 -Compress
+$msBaseline = Build-MsBaseline -Path $msBaselinePath
+$baselineJson = if ($msBaseline) { $msBaseline | ConvertTo-Json -Depth 6 -Compress } else { 'null' }
 $fleetPath = Join-Path -Path $RootPath -ChildPath 'fleet.json'
 Set-Content -LiteralPath $fleetPath -Value $json -Encoding UTF8
 
@@ -425,6 +605,8 @@ $summaryHtml = @"
  th,td{padding:8px 10px;border-bottom:1px solid #1f2937;font-size:12px}
  th{background:#0b1322;text-align:left;color:#a5b4fc;position:sticky;top:0}
  tr:hover{background:#0e1726}
+ tr.clickable-row{cursor:pointer}
+ tr.details-row td{background:#0b1320}
  .badge{display:inline-block;padding:2px 6px;border-radius:12px;font-size:11px}
  .ok{background:#065f46;color:#d1fae5}
  .warn{background:#92400e;color:#ffedd5}
@@ -433,6 +615,8 @@ $summaryHtml = @"
  a{color:#60a5fa;text-decoration:none}
  a:hover{text-decoration:underline}
  td.diff{outline:2px solid #eab308; background: rgba(234,179,8,0.08)}
+ .detail .detail-section{display:none; padding:6px 0}
+ .detail .detail-section.visible{display:block}
 </style>
 </head>
 <body>
@@ -448,24 +632,27 @@ $summaryHtml = @"
     <option value="info">Info (1-39)</option>
     <option value="ok">OK (0)</option>
   </select>
-  <select id="baseline">
-    <option value="">No baseline</option>
-    <option value="__consensus">Baseline: Consensus</option>
-  </select>
+    <select id="baseline">
+        <option value="">No baseline</option>
+        <option value="__msft">Baseline: Microsoft Security Baseline</option>
+    </select>
   <label><input type="checkbox" id="diffOnly"> Differences only</label>
+    <label><input type="checkbox" id="nonCompliant"> Not compliant</label>
  </div>
  <table id="grid"><thead><tr>
   <th>Server</th><th>&#916;</th><th>OS / Build</th><th>Uptime (h)</th><th>Missing Updates</th>
-  <th>Firewall</th><th>RDP NLA</th><th>SMBv1</th><th>AV RT</th><th>ASR</th><th>TLS</th><th>UAC</th><th>ExecPolicy</th><th>Risk</th><th>Assessed</th><th>Details</th>
+    <th>Firewall</th><th>RDP NLA</th><th>SMBv1</th><th>Shares</th><th>AV RT</th><th>ASR</th><th>TLS</th><th>UAC</th><th>URA</th><th>Audit</th><th>Risk</th><th>Assessed</th>
  </tr></thead><tbody></tbody></table>
 </div>
 <script id="fleet-data" type="application/json">$json</script>
+<script id="baseline-data" type="application/json">$baselineJson</script>
 <script>
 (function(){
   function riskBand(score){ if(score>=70) return 'crit'; if(score>=40) return 'warn'; if(score>0) return 'info'; return 'ok'; }
-  function fwBadge(b){ return b?'<span class=\"badge ok\">On</span>':'<span class=\"badge warn\">Off</span>'; }
+    function fwBadge(b){ return b?'<span class=\"badge ok\">On</span>':'<span class=\"badge warn\">Off</span>'; }
   function riskBadge(s){ var b=riskBand(s); return '<span class=\"badge '+(b==='ok'?'ok':(b==='crit'?'crit':'warn'))+'\">'+s+'</span>'; }
-  var data=[]; try{ data=JSON.parse(document.getElementById('fleet-data').textContent)||[] }catch(e){}
+    var data=[]; try{ data=JSON.parse(document.getElementById('fleet-data').textContent)||[] }catch(e){}
+    var msftBaseline=null; try{ msftBaseline=JSON.parse(document.getElementById('baseline-data').textContent) }catch(e){}
   data.sort(function(a,b){ return (b.riskScore||0)-(a.riskScore||0); });
   var tiles=document.getElementById('tiles');
   var total=data.length;
@@ -485,43 +672,43 @@ $summaryHtml = @"
   data.forEach(function(x){ var opt=document.createElement('option'); opt.value=x.server; opt.textContent='Baseline: '+x.server; baselineSel.appendChild(opt); });
 
   // Projection fields used for diffing
-  var fields=[
-    {id:'os', proj:function(x){ return (x.os&&x.os.name?x.os.name:'')+'|'+(x.os&&x.os.build?x.os.build:'')+'|'+(x.os&&x.os.arch?x.os.arch:''); }},
-    {id:'uptime', proj:function(x){ return (x.uptimeHours==null?'':String(x.uptimeHours)); }},
-    {id:'mu', proj:function(x){ var mu=x.missingUpdates||{}; return String(mu.count||0)+'|'+String(mu.sizeMB||0); }},
-    {id:'fw', proj:function(x){ var f=x.firewall||{}; return String(!!f.domain)+'|'+String(!!f.private)+'|'+String(!!f.public); }},
-    {id:'rdp', proj:function(x){ return String(!!x.rdpNlaEnabled); }},
-    {id:'smb1', proj:function(x){ return String(!!x.smb1Enabled); }},
-    {id:'avrt', proj:function(x){ return String(!!(x.av && x.av.realTime)); }},
-    {id:'asr', proj:function(x){ var a=x.av||{}; return String(a.asrEnabled||0)+'/'+String(a.asrTotalPossible||0); }},
-    {id:'tls', proj:function(x){ var t=x.tls||{}; return String(!!t.tls10)+'|'+String(!!t.tls11)+'|'+String(!!t.tls12)+'|'+String(!!t.ssl3); }},
-    {id:'uac', proj:function(x){ return String(!(x.uacEnabled===false)); }},
-    {id:'exec', proj:function(x){ return String(x.execPolicy||''); }},
-    {id:'risk', proj:function(x){ return String(x.riskScore||0); }}
-  ];
+    var fields=[
+        {id:'os', proj:function(x){ return (x.os&&x.os.name?x.os.name:'')+'|'+(x.os&&x.os.build?x.os.build:'')+'|'+(x.os&&x.os.arch?x.os.arch:''); }},
+        {id:'uptime', proj:function(x){ return (x.uptimeHours==null?'':String(x.uptimeHours)); }},
+        {id:'mu', proj:function(x){ var mu=x.missingUpdates||{}; return String(mu.count||0)+'|'+String(mu.sizeMB||0); }},
+        {id:'fw', proj:function(x){ var f=x.firewall||{}; return String(!!f.domain)+'|'+String(!!f.private)+'|'+String(!!f.public); }},
+        {id:'rdp', proj:function(x){ return String(!!x.rdpNlaEnabled); }},
+        {id:'smb1', proj:function(x){ return String(!!x.smb1Enabled); }},
+        {id:'shares', proj:function(x){ var s=x.smbShares||{}; return String(s.everyone||0)+'|'+String(s.total||0); }},
+        {id:'avrt', proj:function(x){ return String(!!(x.av && x.av.realTime)); }},
+        {id:'asr', proj:function(x){ var a=x.av||{}; return String(a.asrEnabled||0)+'/'+String(a.asrTotalPossible||0); }},
+        {id:'tls', proj:function(x){ var t=x.tls||{}; return String(!!t.tls10)+'|'+String(!!t.tls11)+'|'+String(!!t.tls12)+'|'+String(!!t.ssl3); }},
+        {id:'uac', proj:function(x){ return String(!(x.uacEnabled===false)); }},
+        {id:'ura', proj:function(x){ var u=x.userRights||{}; return String(!!u.rdpAllowEveryone)+'|'+String(!!u.rdpAllowDomainUsers); }},
+    {id:'audit', proj:function(x){ var a=x.audit||{}; return String(Object.keys?Object.keys(a).length:0); }},
+        {id:'risk', proj:function(x){ return String(x.riskScore||0); }}
+    ];
 
-  function consensusFor(fid){
-    var counts={};
-    data.forEach(function(x){ var v=fields.find(function(f){return f.id===fid}).proj(x); counts[v]=(counts[v]||0)+1; });
-    var best=null, bestN=-1; Object.keys(counts).forEach(function(k){ if(counts[k]>bestN){ best=k; bestN=counts[k]; }});
-    return best;
-  }
   function getBaselineMap(){
     var sel=baselineSel.value; if(!sel) return null; var map={};
-    if(sel==='__consensus'){ fields.forEach(function(f){ map[f.id]=consensusFor(f.id); }); }
+    if(sel==='__msft' && msftBaseline){ fields.forEach(function(f){ try{ map[f.id]=f.proj(msftBaseline);}catch(e){ map[f.id]=undefined; } }); }
     else { var b=data.find(function(x){return x.server===sel}); if(!b) return null; fields.forEach(function(f){ map[f.id]=f.proj(b); }); }
     return map;
   }
-  function cell(html,isDiff){ return '<td'+(isDiff?' class=\"diff\"':'')+'>'+html+'</td>'; }
+    function cell(html,isDiff,target){ return '<td'+(isDiff?' class=\"diff\"':'')+(target?(' data-detail-target=\"'+target+'\"'):'')+'>'+html+'</td>'; }
 
-  var tbody=document.querySelector('#grid tbody');
+    var tbody=document.querySelector('#grid tbody');
   function render(){
     var q=document.getElementById('q').value.toLowerCase();
     var rb=document.getElementById('risk').value;
     var diffOnly=document.getElementById('diffOnly').checked;
+    var nonCompliant=document.getElementById('nonCompliant').checked;
     var baseMap=getBaselineMap();
+    // If 'Not compliant' is selected but no baseline picked, use Microsoft baseline implicitly if available
+    if(nonCompliant && !baseMap && msftBaseline){ baseMap={}; fields.forEach(function(f){ try{ baseMap[f.id]=f.proj(msftBaseline);}catch(e){ baseMap[f.id]=undefined; } }); }
     var baselineSelVal=document.getElementById('baseline').value;
     var rows='';
+    var complianceIds=['rdp','smb1','tls','uac','ura','audit'];
     data.forEach(function(x){
       var band=riskBand(x.riskScore||0);
       if(q && x.server.toLowerCase().indexOf(q)===-1) return;
@@ -531,31 +718,48 @@ $summaryHtml = @"
       var mu=(x.missingUpdates?x.missingUpdates.count:0)+' / '+(x.missingUpdates?x.missingUpdates.sizeMB:0)+' MB';
       var srvCell=x.reportPath?('<a href="'+x.reportPath+'" target="_blank">'+x.server+'</a>'):x.server;
 
-      var diffs=0; var fvals={};
-      fields.forEach(function(f){ fvals[f.id]=f.proj(x); if(baseMap && baseMap[f.id]!==undefined && baseMap[f.id]!==fvals[f.id]) diffs++; });
-      if(diffOnly && (!baseMap || diffs===0)) return;
+            var diffs=0; var fvals={};
+            fields.forEach(function(f){ fvals[f.id]=f.proj(x); if(baseMap && baseMap[f.id]!==undefined && baseMap[f.id]!==fvals[f.id]) diffs++; });
+            if(diffOnly && (!baseMap || diffs===0)) return;
+            if(nonCompliant){
+                var compDiffs=0;
+                if(baseMap){
+                    for(var i=0;i<complianceIds.length;i++){
+                        var id=complianceIds[i];
+                        if(baseMap[id]!==undefined && fvals[id]!==undefined && baseMap[id]!==fvals[id]) compDiffs++;
+                    }
+                }
+                if(!baseMap || compDiffs===0) return;
+            }
 
-      var cells='';
+            var cells='';
       cells += '<td>'+srvCell+'</td>';
       cells += '<td>'+(baseMap?('<span class=\"badge '+(diffs>0?'warn':'ok')+'\">'+(diffs>99?"99+":diffs)+'</span>'):'<span class=\"muted\">-</span>')+'</td>';
-      cells += cell((osTxt||'<span class=\"muted\">n/a</span>'), baseMap && baseMap.os!==undefined && baseMap.os!==fvals.os);
-      cells += cell((x.uptimeHours!=null?x.uptimeHours:'<span class=\"muted\">n/a</span>'), baseMap && baseMap.uptime!==undefined && baseMap.uptime!==fvals.uptime);
-      cells += cell(mu, baseMap && baseMap.mu!==undefined && baseMap.mu!==fvals.mu);
-      cells += cell('D '+fwBadge(!!fw.domain)+' / P '+fwBadge(!!fw.private)+' / Pu '+fwBadge(!!fw.public), baseMap && baseMap.fw!==undefined && baseMap.fw!==fvals.fw);
-      cells += cell((x.rdpNlaEnabled?'<span class=\"badge ok\">On</span>':'<span class=\"badge warn\">Off</span>'), baseMap && baseMap.rdp!==undefined && baseMap.rdp!==fvals.rdp);
-      cells += cell((x.smb1Enabled?'<span class=\"badge warn\">On</span>':'<span class=\"badge ok\">Off</span>'), baseMap && baseMap.smb1!==undefined && baseMap.smb1!==fvals.smb1);
-      cells += cell((x.av && x.av.realTime===false?'<span class=\"badge warn\">Off</span>':'<span class=\"badge ok\">On</span>'), baseMap && baseMap.avrt!==undefined && baseMap.avrt!==fvals.avrt);
+            cells += cell((osTxt||'<span class=\"muted\">n/a</span>'), baseMap && baseMap.os!==undefined && baseMap.os!==fvals.os, 'os');
+            cells += cell((x.uptimeHours!=null?x.uptimeHours:'<span class=\"muted\">n/a</span>'), baseMap && baseMap.uptime!==undefined && baseMap.uptime!==fvals.uptime, 'uptime');
+            // Show only count; details panel will list update names
+            var muTxt = String((x.missingUpdates?x.missingUpdates.count:0));
+            cells += cell(muTxt, baseMap && baseMap.mu!==undefined && baseMap.mu!==fvals.mu, 'mu');
+            cells += cell('D '+fwBadge(!!fw.domain)+'  P '+fwBadge(!!fw.private)+'  Pu '+fwBadge(!!fw.public), baseMap && baseMap.fw!==undefined && baseMap.fw!==fvals.fw, 'fw');
+            cells += cell((x.rdpNlaEnabled?'<span class=\"badge ok\">On</span>':'<span class=\"badge warn\">Off</span>'), baseMap && baseMap.rdp!==undefined && baseMap.rdp!==fvals.rdp, 'rdp');
+            cells += cell((x.smb1Enabled?'<span class=\"badge warn\">On</span>':'<span class=\"badge ok\">Off</span>'), baseMap && baseMap.smb1!==undefined && baseMap.smb1!==fvals.smb1, 'smb1');
+            var sharesTxt = String((x.smbShares && x.smbShares.everyone)||0)+' of '+String((x.smbShares && x.smbShares.total)||0);
+            cells += cell(sharesTxt, baseMap && baseMap.shares!==undefined && baseMap.shares!==fvals.shares, 'shares');
+            cells += cell((x.av && x.av.realTime===false?'<span class=\"badge warn\">Off</span>':'<span class=\"badge ok\">On</span>'), baseMap && baseMap.avrt!==undefined && baseMap.avrt!==fvals.avrt, 'av');
     var asrTxt = (x.av?((x.av.asrEnabled||0)+'/'+(x.av.asrTotalPossible||0)):'<span class=\"muted\">n/a</span>');
     if(x.av && (x.av.asrDisabled||0)>0){ asrTxt += ' <span class=\"badge warn\">'+String(x.av.asrDisabled)+' disabled</span>'; }
     if(x.av && (x.av.asrAudit||0)>0){ asrTxt += ' <span class=\"badge\" style=\"background:#334155;color:#e2e8f0\">'+String(x.av.asrAudit)+' audit</span>'; }
-    cells += cell(asrTxt, baseMap && baseMap.asr!==undefined && baseMap.asr!==fvals.asr);
-      cells += cell((x.tls?( (x.tls.tls10||x.tls.tls11||x.tls.ssl3?'<span class=\"badge warn\">Weak</span>':'<span class=\"badge ok\">OK</span>' ) ):'<span class=\"muted\">n/a</span>'), baseMap && baseMap.tls!==undefined && baseMap.tls!==fvals.tls);
-      cells += cell((x.uacEnabled===false?'<span class=\"badge warn\">Off</span>':'<span class=\"badge ok\">On</span>'), baseMap && baseMap.uac!==undefined && baseMap.uac!==fvals.uac);
-      cells += cell((x.execPolicy||'<span class=\"muted\">n/a</span>'), baseMap && baseMap.exec!==undefined && baseMap.exec!==fvals.exec);
+            cells += cell(asrTxt, baseMap && baseMap.asr!==undefined && baseMap.asr!==fvals.asr, 'asr');
+            cells += cell((x.tls?( (x.tls.tls10||x.tls.tls11||x.tls.ssl3?'<span class=\"badge warn\">Weak</span>':'<span class=\"badge ok\">OK</span>' ) ):'<span class=\"muted\">n/a</span>'), baseMap && baseMap.tls!==undefined && baseMap.tls!==fvals.tls, 'tls');
+            cells += cell((x.uacEnabled===false?'<span class=\"badge warn\">Off</span>':'<span class=\"badge ok\">On</span>'), baseMap && baseMap.uac!==undefined && baseMap.uac!==fvals.uac, 'uac');
+            var uraState = (x.userRights && (x.userRights.rdpAllowEveryone||x.userRights.rdpAllowDomainUsers));
+            cells += cell(uraState?'<span class=\"badge warn\">Risk</span>':'<span class=\"badge ok\">OK</span>', baseMap && baseMap.ura!==undefined && baseMap.ura!==fvals.ura, 'ura');
+            var auditCount = (x.audit?Object.keys(x.audit).length:0);
+            cells += cell(String(auditCount)+' items', baseMap && baseMap.audit!==undefined && baseMap.audit!==fvals.audit, 'audit');
       cells += '<td>'+riskBadge(x.riskScore||0)+'</td>';
       cells += '<td>'+(x.assessedAt||'')+'</td>';
-      // Details panel
-      var bObj=null; if(baselineSelVal && baselineSelVal!=='__consensus'){ bObj = data.find(function(d){ return d.server===baselineSelVal; }) || null; }
+            // Details panel content
+    var bObj=null; if(baselineSelVal){ if(baselineSelVal==='__msft'){ bObj = msftBaseline; } else { bObj = data.find(function(d){ return d.server===baselineSelVal; }) || null; } }
       function badge(val){ return val?'<span class="badge ok">On</span>':'<span class="badge warn">Off</span>'; }
       function list(arr){ return (arr && arr.length)?arr.join('; '):'<span class="muted">none</span>'; }
       function cmpUserRights(a,b){ a=a||{}; b=b||{}; var keys={}; var out='';
@@ -564,31 +768,54 @@ $summaryHtml = @"
         if(!out){ out='<div class="muted">No user rights data</div>'; }
         return out;
       }
-      function cmpAudit(a,b){ a=a||{}; b=b||{}; var keys={}; var out='';
-        Object.keys(a).forEach(function(k){keys[k]=true}); Object.keys(b).forEach(function(k){keys[k]=true});
-        Object.keys(keys).sort().forEach(function(k){ var va=a[k]||'', vb=b[k]||''; var same = (va===vb); out+='<div><strong>'+k+':</strong> '+(va||'<span class="muted">n/a</span>')+(bObj?(' vs <em>'+(vb||'n/a')+'</em>'):'')+' '+(bObj?(same?'<span class="badge ok">same</span>':'<span class="badge warn">diff</span>'):'')+'</div>'; });
-        if(!out){ out='<div class="muted">No audit settings</div>'; }
-        return out;
-      }
-      var detailsHtml = '<div style="display:none" class="detail">'+
-        '<div><strong>UAC:</strong> '+badge(!(x.uacEnabled===false))+(bObj?(' vs <em>'+badge(!(bObj.uacEnabled===false))+'</em>'):'')+'</div>'+
-        '<div><strong>AV Realtime:</strong> '+badge(!!(x.av&&x.av.realTime))+(bObj?(' vs <em>'+badge(!!(bObj.av&&bObj.av.realTime))+'</em>'):'')+'</div>'+
-        '<div><strong>Firewall:</strong> D '+badge(!!fw.domain)+' / P '+badge(!!fw.private)+' / Pu '+badge(!!fw.public)+(bObj?(' vs <em>D '+badge(!!(bObj.firewall&&bObj.firewall.domain))+' / P '+badge(!!(bObj.firewall&&bObj.firewall.private))+' / Pu '+badge(!!(bObj.firewall&&bObj.firewall.public))+'</em>'):'')+'</div>'+
-        '<div><strong>RDP NLA:</strong> '+badge(!!x.rdpNlaEnabled)+(bObj?(' vs <em>'+badge(!!(bObj&&bObj.rdpNlaEnabled))+'</em>'):'')+'</div>'+
-        '<div><strong>SMBv1:</strong> '+badge(!!x.smb1Enabled)+(bObj?(' vs <em>'+badge(!!(bObj&&bObj.smb1Enabled))+'</em>'):'')+'</div>'+
-    '<div><strong>ASR enabled/total possible:</strong> '+(x.av?((x.av.asrEnabled||0)+'/'+(x.av.asrTotalPossible||0)):'n/a')+(bObj?(' vs <em>'+(bObj.av?((bObj.av.asrEnabled||0)+'/'+(bObj.av.asrTotalPossible||0)):'n/a')+'</em>'):'')+'</div>'+
-    (x.av?('<div><span class=\"muted\">Configured: '+String(x.av.asrConfigured||0)+', Disabled: '+String(x.av.asrDisabled||0)+', Audit: '+String(x.av.asrAudit||0)+'</span></div>'):'')+
-        '<div><strong>Shares (Everyone count):</strong> '+String((x.smbShares&&x.smbShares.everyone)||0)+(bObj?(' vs <em>'+String((bObj.smbShares&&bObj.smbShares.everyone)||0)+'</em>'):'')+'</div>'+
-        '<div style="margin-top:8px"><strong>User Rights</strong><div style="margin-left:8px">'+cmpUserRights(x.userRightsFull, bObj?(bObj.userRightsFull||{}):{})+'</div></div>'+
-        '<div style="margin-top:8px"><strong>Audit Settings</strong><div style="margin-left:8px; max-height:240px; overflow:auto">'+cmpAudit(x.audit, bObj?(bObj.audit||{}):{})+'</div></div>'+
-      '</div>';
-      cells += '<td><button class="btn-details">View</button>'+detailsHtml+'</td>';
-      rows += '<tr>'+cells+'</tr>';
+            function cmpAudit(a,b){ a=a||{}; b=b||{}; var keys={}; var out='';
+                Object.keys(a).forEach(function(k){keys[k]=true}); Object.keys(b).forEach(function(k){keys[k]=true});
+                Object.keys(keys).sort().forEach(function(k){ var va=a[k]||'', vb=b[k]||''; var same = (va===vb); out+='<div><strong>'+k+':</strong> '+(va||'<span class="muted">n/a</span>')+(bObj?(' vs <em>'+(vb||'n/a')+'</em>'):'')+' '+(bObj?(same?'<span class="badge ok">same</span>':'<span class="badge warn">diff</span>'):'')+'</div>'; });
+                if(!out){ out='<div class="muted">No audit settings</div>'; }
+                return out;
+            }
+                    function renderMap(obj){ if(!obj) return '<span class="muted">n/a</span>'; var html=''; var keys=Object.keys(obj); if(keys.length===0) return '<span class="muted">n/a</span>'; keys.sort().forEach(function(k){ var v=obj[k]; if(typeof v==='boolean'){ v = v?badge(true):badge(false);} html+='<div><strong>'+k+':</strong> '+v+'</div>'; }); return html; }
+                    function renderShares(list){ if(!list||!list.length) return '<span class="muted">none</span>'; var out=''; list.forEach(function(s){ out+='<div><strong>'+ (s.name||'') +'</strong> <span class="muted">'+(s.path||'')+'</span>'+(s.everyone?' <span class="badge warn">Everyone</span>':'')+'</div>'; }); return out; }
+                    var detailsHtml = '<div class="detail">'+
+                        '<div class="detail-section" id="section-mu"><strong>Missing Updates</strong><div>'+( (x.muDetails && x.muDetails.length)? x.muDetails.map(function(s){return '<div>'+s+'</div>'}).join('') : '<span class="muted">none</span>' )+'</div></div>'+
+                        '<div class="detail-section" id="section-uac"><strong>UAC</strong><div>'+renderMap(x.uacDetails)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+renderMap(bObj.uacDetails)+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-av"><strong>Antivirus</strong><div>'+renderMap(x.avDetails)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+renderMap(bObj.avDetails)+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-fw"><strong>Firewall Profiles</strong><div>'+renderMap(x.fwDetails)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+renderMap(bObj.fwDetails)+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-rdp"><strong>RDP</strong><div>'+renderMap(x.rdpDetails)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+renderMap(bObj.rdpDetails)+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-smb1"><strong>SMBv1</strong><div>'+badge(!!x.smb1Enabled)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+badge(!!(bObj&&bObj.smb1Enabled))+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-shares"><strong>SMB Shares</strong><div>'+renderShares(x.sharesDetails)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+renderShares(bObj.sharesDetails)+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-asr"><strong>ASR</strong><div>Enabled/Total: '+(x.av?((x.av.asrEnabled||0)+'/'+(x.av.asrTotalPossible||0)):'n/a')+'</div>'+(x.av?('<div><span class=\"muted\">Configured: '+String(x.av.asrConfigured||0)+', Disabled: '+String(x.av.asrDisabled||0)+', Audit: '+String(x.av.asrAudit||0)+'</span></div>'):'')+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+(bObj.av?((bObj.av.asrEnabled||0)+'/'+(bObj.av.asrTotalPossible||0)):'n/a')+'</div></div>'):'')+'</div>'+
+                        '<div class="detail-section" id="section-ura"><strong>User Rights</strong><div style="margin-left:8px">'+cmpUserRights(x.userRightsFull, bObj?(bObj.userRightsFull||{}):{})+'</div></div>'+
+                        '<div class="detail-section" id="section-audit"><strong>Audit Settings</strong><div style="margin-left:8px; max-height:240px; overflow:auto">'+cmpAudit(x.audit, bObj?(bObj.audit||{}):{})+'</div></div>'+
+                        '<div class="detail-section" id="section-tls"><strong>TLS/SSL</strong><div>'+renderMap(x.tlsDetails)+'</div>'+(bObj?('<div style="margin-top:6px"><em>Baseline</em><div>'+renderMap(bObj.tlsDetails)+'</div></div>'):'')+'</div>'+
+                    '</div>';
+            var dataRow = '<tr class="clickable-row">'+cells+'</tr>';
+            var detailsRow = '<tr class="details-row" style="display:none"><td colspan="17">'+detailsHtml+'</td></tr>';
+            rows += dataRow + detailsRow;
     });
-    tbody.innerHTML=rows||'<tr><td colspan="16" class="muted">No data</td></tr>';
-    Array.prototype.slice.call(document.querySelectorAll('.btn-details')).forEach(function(btn){
-      btn.addEventListener('click', function(){ var d=this.nextElementSibling; if(!d) return; d.style.display = (d.style.display==='none' || !d.style.display)?'block':'none'; this.textContent = d.style.display==='block'?'Hide':'View'; });
-    });
+        tbody.innerHTML=rows||'<tr><td colspan="17" class="muted">No data</td></tr>';
+        Array.prototype.slice.call(document.querySelectorAll('tr.clickable-row')).forEach(function(tr){
+            tr.addEventListener('click', function(e){
+                var td = e.target && e.target.closest ? e.target.closest('td') : null;
+                if(!td) return;
+                if(e.target && e.target.tagName==='A') return; // allow link clicks
+                var target = td.getAttribute('data-detail-target');
+                if(!target) return;
+                var d = this.nextElementSibling; if(!d || !d.classList.contains('details-row')) return;
+                var content = d.querySelector('.detail'); if(!content) return;
+                var sections = content.querySelectorAll('.detail-section');
+                var active = content.querySelector('.detail-section.visible');
+                var targetId = target==='mu' ? 'mu' : target;
+                var next = content.querySelector('#section-'+(''+targetId));
+                if(!next) { d.style.display='none'; return; }
+                // If clicking the same visible section, toggle row
+                if(d.style.display!=='none' && active && next===active){ d.style.display='none'; return; }
+                // Otherwise, show row and switch sections
+                for(var i=0;i<sections.length;i++){ sections[i].classList.remove('visible'); }
+                next.classList.add('visible');
+                d.style.display='table-row';
+            });
+        });
   }
   document.getElementById('q').addEventListener('input',render);
   document.getElementById('risk').addEventListener('change',render);

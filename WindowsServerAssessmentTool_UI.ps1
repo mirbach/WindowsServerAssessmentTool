@@ -72,8 +72,11 @@ $pDiscover.Location = (New-Object System.Drawing.Point (20,60))
 $pDiscover.Size = (New-Object System.Drawing.Size (760,40))
 
 # Controls
-$btnInstallRSAT = New-Button -Text 'Install RSAT (AD Module)' -X 0 -Y 8 -W 220
-$lblRSATStatus = New-Label -Text 'RSAT: Unknown' -X 540 -Y 10 -W 200
+$btnInstallRSAT = New-Button -Text 'Install RSAT (AD Module)' -X 0 -Y 8 -W 200
+$lblRSATStatus = New-Label -Text 'RSAT: Unknown' -X 205 -Y 10 -W 120
+# LAPS controls in the same toolbar
+$btnInstallLAPS = New-Button -Text 'Install LAPS modules' -X 340 -Y 8 -W 200
+$lblLAPSStatus = New-Label -Text 'LAPS: Unknown' -X 545 -Y 10 -W 200
 # Left align discovery buttons
 $btnGetDCs = New-Button -Text 'Get Domain Controllers' -X 0 -Y 8 -W 220
 $btnGetMembers = New-Button -Text 'Get Member Servers' -X 240 -Y 8 -W 220
@@ -97,6 +100,7 @@ $tbOutput = New-TextBox -Text (Join-Path $scriptRoot 'AssessmentResults') -X 120
 $btnBrowse = New-Button -Text 'Browse' -X 730 -Y 418 -W 50 -H 26
 
 $btnRun = New-Button -Text 'Run Assessment' -X 20 -Y 460 -W 220
+$chkUseLaps = New-CheckBox -Text 'Use LAPS credentials' -X 260 -Y 467 -W 200
 $btnRun.Enabled = Test-Path -LiteralPath $wrapperPath
 
 $lblLog = New-Label -Text 'Log:' -X 20 -Y 500
@@ -113,14 +117,14 @@ $script:currentJobId = $null
 $script:timerHooked = $false
 
 # Add controls
-$pRSAT.Controls.AddRange(@($btnInstallRSAT, $lblRSATStatus))
+$pRSAT.Controls.AddRange(@($btnInstallRSAT, $lblRSATStatus, $btnInstallLAPS, $lblLAPSStatus))
 $pDiscover.Controls.AddRange(@($btnGetDCs, $btnGetMembers))
 $Form.Controls.AddRange(@(
     $pRSAT, $pDiscover,
     $lblComputers, $lbComputers, $chkRunAll,
     $lblMenu, $cbMenu,
     $lblOutput, $tbOutput, $btnBrowse,
-    $btnRun, $lblLog, $tbLog
+    $btnRun, $chkUseLaps, $lblLog, $tbLog
 ))
 
 # Helpers
@@ -157,6 +161,65 @@ function Update-RSATStatus {
         $lblRSATStatus.Text = 'RSAT: Unknown'
         $lblRSATStatus.ForeColor = [System.Drawing.Color]::Black
     }
+}
+
+function Test-LAPSModulePresent {
+    try {
+        if (Get-Command -Name Get-LapsADPassword -ErrorAction SilentlyContinue) { return $true }
+        if (Get-Command -Name Get-AdmPwdPassword -ErrorAction SilentlyContinue) { return $true }
+        return $false
+    } catch { return $false }
+}
+
+function Update-LAPSStatus {
+    try {
+        if (Test-LAPSModulePresent) {
+            $lblLAPSStatus.Text = 'LAPS: Installed'
+            $lblLAPSStatus.ForeColor = [System.Drawing.Color]::Green
+        } else {
+            $lblLAPSStatus.Text = 'LAPS: Not installed'
+            $lblLAPSStatus.ForeColor = [System.Drawing.Color]::Red
+        }
+    } catch {
+        $lblLAPSStatus.Text = 'LAPS: Unknown'
+        $lblLAPSStatus.ForeColor = [System.Drawing.Color]::Black
+    }
+}
+
+function Install-LAPSModulesFromGallery {
+    Write-UILog 'Checking for LAPS modules...'
+    try {
+        # Trust PSGallery for this session if needed
+        $repo = Get-PSRepository -Name 'PSGallery' -ErrorAction SilentlyContinue
+        if ($repo -and $repo.InstallationPolicy -ne 'Trusted') {
+            Write-UILog 'Setting PSGallery as Trusted for module install.'
+            Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted -ErrorAction SilentlyContinue | Out-Null
+        }
+    } catch { Write-UILog ('PSGallery check failed: {0}' -f $_.Exception.Message) }
+
+    $installedAny = $false
+    # Try Windows LAPS module first
+    if (-not (Get-Command -Name Get-LapsADPassword -ErrorAction SilentlyContinue)) {
+        try {
+            Write-UILog 'Installing LAPS module (Windows LAPS) from PSGallery...'
+            Install-Module -Name LAPS -Scope CurrentUser -Force -ErrorAction Stop
+            Import-Module LAPS -ErrorAction SilentlyContinue | Out-Null
+            $installedAny = $true
+            Write-UILog 'Installed LAPS module.'
+        } catch { Write-UILog ('Failed to install LAPS module: {0}' -f $_.Exception.Message) }
+    }
+    # Legacy AdmPwd.PS
+    if (-not (Get-Command -Name Get-AdmPwdPassword -ErrorAction SilentlyContinue)) {
+        try {
+            Write-UILog 'Installing AdmPwd.PS (legacy LAPS) from PSGallery...'
+            Install-Module -Name AdmPwd.PS -Scope CurrentUser -Force -ErrorAction Stop
+            Import-Module AdmPwd.PS -ErrorAction SilentlyContinue | Out-Null
+            $installedAny = $true
+            Write-UILog 'Installed AdmPwd.PS module.'
+        } catch { Write-UILog ('Failed to install AdmPwd.PS: {0}' -f $_.Exception.Message) }
+    }
+    if (-not $installedAny) { Write-UILog 'No LAPS modules were installed. They may already be present or installation failed.' }
+    Update-LAPSStatus
 }
 
 function Install-ADModuleOnClient {
@@ -246,6 +309,14 @@ $btnInstallRSAT.Add_Click({
     }
 })
 
+$btnInstallLAPS.Add_Click({
+    try {
+        Install-LAPSModulesFromGallery
+    } catch {
+        Write-UILog ('LAPS install error: {0}' -f $_.Exception.Message)
+    }
+})
+
 $btnRun.Add_Click({
     # Validate
     $menuText = $cbMenu.SelectedItem
@@ -267,14 +338,18 @@ $btnRun.Add_Click({
     Write-UILog ("Starting assessment on {0} target(s) with menu {1}" -f $targets.Count, $menuChoice)
 
     $job = Start-Job -ScriptBlock {
-        param($wrapper, $cn, $choice, $out)
+        param($wrapper, $cn, $choice, $out, $useLaps)
         try {
             # Invoke the wrapper script directly to get structured results
-            & $wrapper -ComputerName $cn -MenuChoice $choice -OutputRoot $out
+            if ($useLaps) {
+                & $wrapper -ComputerName $cn -MenuChoice $choice -OutputRoot $out -UseLaps
+            } else {
+                & $wrapper -ComputerName $cn -MenuChoice $choice -OutputRoot $out
+            }
         } catch {
             "ERROR: $($_.Exception.Message)"
         }
-    } -ArgumentList @($wrapperPath, $targets, $menuChoice, $outDir)
+    } -ArgumentList @($wrapperPath, $targets, $menuChoice, $outDir, $chkUseLaps.Checked)
 
     # Initialize output index for this job and register job id for the timer
     $script:currentJobId = $job.Id
@@ -346,4 +421,5 @@ $btnRun.Add_Click({
 
 # Show form
     Update-RSATStatus
+    Update-LAPSStatus
 [void]$Form.ShowDialog()

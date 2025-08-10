@@ -1049,39 +1049,48 @@ function Get-SecurityInformation {
     Write-Host "Collecting GPO Settings..." -ForegroundColor Yellow    
     GPResult /H $GPOSettings
 
-    # Function to get only main audit policy categories
-    function Get-MainAuditPolicyCategories {
-        $rawOutput = auditpol /get /category:* | Out-String
-        $lines = $rawOutput -split "`r`n"
-        
-        $results = @()
-        
-        foreach ($line in $lines) {
-            $line = $line.Trim()
-            
-            # Skip empty lines, headers, and indented subcategories
-            if ($line -eq "" -or $line -match "System audit policy" -or $line -match "^\s") {
+    # Function to parse audit policy with Category, Subcategory, and Setting
+    function Get-AuditPolicyStructured {
+        $raw = auditpol /get /category:* | Out-String
+        $lines = $raw -split "`r`n"
+        $results = New-Object System.Collections.Generic.List[object]
+        $currentCategory = $null
+
+        foreach ($rawLine in $lines) {
+            if ([string]::IsNullOrWhiteSpace($rawLine)) { continue }
+            $line = $rawLine
+            # Skip header/separator rows (language-agnostic heuristics)
+            if ($line -match '^-{3,}' -or $line -match 'Category/.*Subcategory' -or $line -match 'System audit policy') { continue }
+
+            # Category lines typically have no leading spaces; subcategories are indented
+            if ($line -notmatch '^\s') {
+                $currentCategory = $line.Trim()
                 continue
             }
-            
-            # Only process lines that are main categories (no forward slash)
-            if ($line -notmatch "/") {
-                $category = $line -replace "\s+Setting:.*$", ""
-                $setting = ($line -split "Setting:")[-1].Trim()
-                
-                $results += [PSCustomObject]@{
-                    Category = $category
-                    Setting = $setting
-                    Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-                }
+
+            # Subcategory rows: "    <Subcategory><spaces><Setting>"
+            $m = [regex]::Match($line, '^\s{2,}(.+?)\s{2,}([^\s].*)$')
+            if (-not $m.Success) { continue }
+            $sub = $m.Groups[1].Value.Trim()
+            $setting = $m.Groups[2].Value.Trim()
+
+            $obj = [PSCustomObject]@{
+                Category      = $currentCategory
+                Subcategory   = $sub
+                Setting       = $setting
+                'SettingText' = ("{0}  {1}" -f $sub, $setting) # two spaces to match dashboard parser
+                Timestamp     = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
             }
+            $results.Add($obj) | Out-Null
         }
-        
         return $results
-    }    Write-Host "Collecting Audit Policy Settings..." -ForegroundColor Yellow
-    $auditSettings = Get-MainAuditPolicyCategories
+    }
+
+    Write-Host "Collecting Audit Policy Settings..." -ForegroundColor Yellow
+    $auditSettings = Get-AuditPolicyStructured
     $auditSettings | Export-Csv -Path $CsvAuditSettings -NoTypeInformation
-    $auditSettingsHtml = $auditSettings | ConvertTo-Html -Fragment -PreContent "<h2>Audit Policies Settings</h2>"
+    # Prefer a clean projection (Category, Subcategory, Setting) for HTML
+    $auditSettingsHtml = ($auditSettings | Select-Object Category, Subcategory, Setting) | ConvertTo-Html -Fragment -PreContent "<h2>Audit Policies Settings</h2>"
 
     # === TLS 1.2 Check ===
     Write-Host "Collecting TLS Registry Settings..." -ForegroundColor Yellow
