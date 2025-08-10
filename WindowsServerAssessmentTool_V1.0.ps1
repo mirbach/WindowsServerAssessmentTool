@@ -431,7 +431,7 @@ $csvUserRightsAssignments = Join-Path -Path $path -ChildPath "$ServerName-UserRi
         Write-Warning "Failed to collect Windows Services: $($_.Exception.Message)"
         $htmlSections['RunningServices'] = "<h2>Running Windows Services</h2><p>Error collecting running services</p>"
         $htmlSections['StoppedServices'] = "<h2>Stopped Windows Services</h2><p>Error collecting stopped services</p>"
-        }
+    }
         # === User Rights Assignments ===
         Write-Host "Collecting User Rights Assignments..." -ForegroundColor Yellow
         try {
@@ -439,12 +439,14 @@ $csvUserRightsAssignments = Join-Path -Path $path -ChildPath "$ServerName-UserRi
             secedit /export /cfg $tempInf /areas USER_RIGHTS | Out-Null
             $userRightsRaw = Select-String -Path $tempInf -Pattern "^Se.* = .+" | ForEach-Object {
                 $line = $_.Line
-                $parts = $line -split " = "
-                [PSCustomObject]@{
-                    "Privilege" = $parts[0]
-                    "AssignedTo" = $parts[1]
+                $parts = $line -split " = ", 2
+                if ($parts.Count -ge 2) {
+                    [PSCustomObject]@{
+                        "Privilege" = $parts[0]
+                        "AssignedTo" = $parts[1]
+                    }
                 }
-            }
+            } | Where-Object { $_ }
             $userRightsRaw | Export-Csv -Path $csvUserRightsAssignments -NoTypeInformation
             $htmlSections['UserRightsAssignments'] = $userRightsRaw | ConvertTo-Html -Fragment -PreContent "<h2>User Rights Assignments</h2>"
             Write-Host "User Rights Assignments - Completed" -ForegroundColor Green
@@ -453,107 +455,145 @@ $csvUserRightsAssignments = Join-Path -Path $path -ChildPath "$ServerName-UserRi
             Write-Warning "Failed to collect User Rights Assignments: $($_.Exception.Message)"
             $htmlSections['UserRightsAssignments'] = "<h2>User Rights Assignments</h2><p>Error collecting User Rights Assignments</p>"
         }
-    }    # === Installed Programs ===
+    # === Installed Programs ===
     Write-Host "Collecting Installed Programs..." -ForegroundColor Yellow
+    if (-not $htmlSections) { $htmlSections = @{} }
     try {
         # Get installed programs from 32-bit, 64-bit, and user-specific registry locations
-        $installedprogs32 = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
-        $installedprogs64 = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
-        $installedprogsUser = Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
-        
-        # Combine all lists and remove duplicates based on DisplayName
-        $installedprogsAll = @($installedprogs32) + @($installedprogs64) + @($installedprogsUser) | Sort-Object DisplayName -Unique
-          # Select only relevant fields and filter out empty entries
-        $installedprogs = $installedprogsAll | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, EstimatedSize | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" }
-        
+        $installedprogs32 = @(Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" })
+        $installedprogs64 = @(Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" })
+        $installedprogsUser = @(Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" })
+
+        # Combine all lists and remove duplicates based on DisplayName; drop nulls defensively
+        $installedprogsAll = @($installedprogs32 + $installedprogs64 + $installedprogsUser) |
+            Where-Object { $_ -and $_.DisplayName } |
+            Sort-Object -Property DisplayName -Unique
+
+        # Select only relevant fields and filter out empty entries
+        $installedprogs = @($installedprogsAll | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, EstimatedSize |
+            Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" })
+
         $csvinstalledprogsinfo = Join-Path -Path $Path -ChildPath "$ServerName-InstalledProgs.csv"
         $installedprogs | Export-Csv -Path $csvinstalledprogsinfo -NoTypeInformation
-          # Create custom display object for HTML with renamed columns
-        $installedprogsDisplay = $installedprogs | ForEach-Object {
-            # Format InstallDate to proper DateTime format
-            $formattedDate = "N/A"
-            if ($_.InstallDate -and $_.InstallDate.ToString().Trim() -ne "") {
-                try {
-                    # InstallDate is typically in YYYYMMDD format from registry
-                    $dateString = $_.InstallDate.ToString()
-                    if ($dateString.Length -eq 8 -and $dateString -match '^\d{8}$') {
-                        # Parse YYYYMMDD format
-                        $year = $dateString.Substring(0, 4)
-                        $month = $dateString.Substring(4, 2)
-                        $day = $dateString.Substring(6, 2)
-                        $dateTime = [DateTime]::ParseExact("$year-$month-$day", "yyyy-MM-dd", $null)
-                        $formattedDate = $dateTime.ToString("dd MMMM yyyy h:mm:ss tt")
-                    } else {
-                        # Try to parse as regular DateTime if not in YYYYMMDD format
-                        $dateTime = [DateTime]::Parse($dateString)
-                        $formattedDate = $dateTime.ToString("dd MMMM yyyy h:mm:ss tt")
-                    }
-                } catch {
-                    # If parsing fails, keep original value or set to N/A
-                    $formattedDate = if ($_.InstallDate) { $_.InstallDate.ToString() } else { "N/A" }
+
+        # Create display list; avoid fragile date parsing and just render as string
+        if (-not $installedprogs -or $installedprogs.Count -eq 0) {
+            $installedprogsDisplay = @([PSCustomObject]@{
+                "Program Name" = "None"
+                "Program Version" = "N/A"
+                "Publisher" = "N/A"
+                "Size (MB)" = "N/A"
+                "Installed Date" = "N/A"
+            })
+        } else {
+            $installedprogsDisplay = $installedprogs | ForEach-Object {
+                [PSCustomObject]@{
+                    "Program Name" = $_.DisplayName
+                    "Program Version" = $_.DisplayVersion
+                    "Publisher" = $_.Publisher
+                    "Size (MB)" = $_.EstimatedSize
+                    "Installed Date" = if ($_.InstallDate) { $_.InstallDate.ToString() } else { "N/A" }
                 }
-            }
-            
-            [PSCustomObject]@{
-                "Program Name" = $_.DisplayName
-                "Program Version" = $_.DisplayVersion
-                "Publisher" = $_.Publisher
-                "Size (MB)" = $_.EstimatedSize
-                "Installed Date" = $formattedDate
             }
         }
         $htmlSections['InstalledPrograms'] = $installedprogsDisplay | ConvertTo-Html -Fragment -PreContent "<h2>Installed Programs</h2>"
         Write-Host "Installed Programs - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect Installed Programs: $($_.Exception.Message)"
-        $htmlSections['InstalledPrograms'] = "<h2>Installed Programs</h2><p>Error collecting installed programs</p>"
-    }    # === Running Processes ===
+        if ($null -ne $htmlSections) {
+            $htmlSections['InstalledPrograms'] = "<h2>Installed Programs</h2><p>Error collecting installed programs</p>"
+        }
+    }
+    # === Running Processes ===
     Write-Host "Collecting Current Running Processes..." -ForegroundColor Yellow
     try {
-        $processesRaw = Get-Process -IncludeUserName | Select-Object Id, SessionId, ProcessName, StartTime, UserProcessorTime, TotalProcessorTime, CPU, Description, UserName, Path
-        $allProcesses = Get-Process -IncludeUserName 
+        $procList = $null
+        $includeUserName = $true
+        try {
+            $procList = Get-Process -IncludeUserName -ErrorAction Stop
+        } catch {
+            Write-Verbose "Get-Process -IncludeUserName failed, falling back without usernames: $($_.Exception.Message)"
+            $procList = Get-Process
+            $includeUserName = $false
+        }
 
-        # Create PSCustomObject array with user-friendly column names
-        $CurrentProcesses = $processesRaw | ForEach-Object {
+        $allProcesses = @($procList)
+
+        # Create PSCustomObject array with user-friendly column names, guarding properties that can throw
+        $CurrentProcesses = foreach ($p in $allProcesses) {
+            $id = $null; $sid = $null; $pname = $null; $start = $null; $uTime = $null; $tTime = $null; $cpu = $null; $desc = $null; $uname = $null; $pathExe = $null
+            try { $id = $p.Id } catch {}
+            try { $sid = $p.SessionId } catch {}
+            try { $pname = $p.ProcessName } catch {}
+            try { $start = $p.StartTime } catch {}
+            try { $uTime = $p.UserProcessorTime } catch {}
+            try { $tTime = $p.TotalProcessorTime } catch {}
+            try { $cpu = $p.CPU } catch {}
+            try { $desc = $p.Description } catch {}
+            if ($includeUserName) { try { $uname = $p.UserName } catch {} }
+            try { $pathExe = $p.Path } catch {}
+
             [PSCustomObject]@{
-                'Process ID' = $_.Id
-                'Session ID' = $_.SessionId
-                'Process Name' = $_.ProcessName
-                'Start Time' = if ($_.StartTime) { $_.StartTime.ToString("yyyy-MM-dd HH:mm:ss") } else { "N/A" }
-                'User CPU Time' = if ($_.UserProcessorTime) { $_.UserProcessorTime.ToString("hh\:mm\:ss") } else { "N/A" }
-                'Total CPU Time' = if ($_.TotalProcessorTime) { $_.TotalProcessorTime.ToString("hh\:mm\:ss") } else { "N/A" }
-                'CPU %' = if ($_.CPU) { [math]::Round($_.CPU, 2) } else { "N/A" }
-                'Description' = if ($_.Description) { $_.Description } else { "N/A" }
-                'User Name' = if ($_.UserName) { $_.UserName } else { "N/A" }
-                'Executable Path' = if ($_.Path) { $_.Path } else { "N/A" }
+                'Process ID' = if ($id) { $id } else { 'N/A' }
+                'Session ID' = if ($null -ne $sid) { $sid } else { 'N/A' }
+                'Process Name' = if ($pname) { $pname } else { 'N/A' }
+                'Start Time' = if ($start) { $start.ToString('yyyy-MM-dd HH:mm:ss') } else { 'N/A' }
+                'User CPU Time' = if ($uTime) { $uTime.ToString('hh\:mm\:ss') } else { 'N/A' }
+                'Total CPU Time' = if ($tTime) { $tTime.ToString('hh\:mm\:ss') } else { 'N/A' }
+                'CPU %' = if ($null -ne $cpu) { [math]::Round([double]$cpu, 2) } else { 'N/A' }
+                'Description' = if ($desc) { $desc } else { 'N/A' }
+                'User Name' = if ($uname) { $uname } else { 'N/A' }
+                'Executable Path' = if ($pathExe) { $pathExe } else { 'N/A' }
             }
         }
 
         $csvallProcesses = Join-Path -Path $Path -ChildPath "$ServerName-allProcesses.csv"
-        $allProcesses | Export-Csv -Path $csvallProcesses -NoTypeInformation
-        $htmlSections['RunningProcesses'] = "<div class='table-container'>" + ($CurrentProcesses | ConvertTo-Html -Fragment -PreContent "<h2>Current Running Processes</h2>") + "</div>"
+        if ($allProcesses.Count -gt 0) {
+            $allProcesses | Export-Csv -Path $csvallProcesses -NoTypeInformation
+        } else {
+            Write-Verbose "No running processes found to export. Skipping CSV export."
+        }
+
+        if ($null -eq $htmlSections) { $htmlSections = @{} }
+        if ($CurrentProcesses -and $CurrentProcesses.Count -gt 0) {
+            $htmlSections['RunningProcesses'] = "<div class='table-container'>" + ($CurrentProcesses | ConvertTo-Html -Fragment -PreContent "<h2>Current Running Processes</h2>") + "</div>"
+        } else {
+            $htmlSections['RunningProcesses'] = "<h2>Current Running Processes</h2><p>No process information available.</p>"
+        }
         Write-Host "Current Running Processes - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect Running Processes: $($_.Exception.Message)"
+        if ($null -eq $htmlSections) { $htmlSections = @{} }
         $htmlSections['RunningProcesses'] = "<h2>Current Running Processes</h2><p>Error collecting running processes</p>"
-    }# === Updates Installed ===
+    }
+    # === Updates Installed ===
     Write-Host "Collecting Windows Updates..." -ForegroundColor Yellow
     try {
-        $updatesRaw = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object HotFixID, InstalledOn, InstalledBy
+        $updatesRaw = @(Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object HotFixID, InstalledOn, InstalledBy)
         $updates = $updatesRaw | ForEach-Object {
             [PSCustomObject]@{
                 "Hot Fix ID" = $_.HotFixID
-                "Installed On" = $_.InstalledOn
-                "Installed By" = $_.InstalledBy
+                "Installed On" = if ($_.InstalledOn) { $_.InstalledOn } else { $null }
+                "Installed By" = if ($_.InstalledBy) { $_.InstalledBy } else { 'N/A' }
             }
         }
-        $updatesAll = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object *
+        $updatesAll = @(Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object *)
         $csvupdatesinstalledinfo = Join-Path -Path $Path -ChildPath "$ServerName-UpdatesInstalledInfo.csv"
-        $updatesAll | Export-Csv -Path $csvupdatesinstalledinfo -NoTypeInformation
-        $htmlSections['InstalledUpdates'] = $updates | ConvertTo-Html -Fragment -PreContent "<h2>Updates Installed</h2>"
+        if ($updatesAll.Count -gt 0) {
+            $updatesAll | Export-Csv -Path $csvupdatesinstalledinfo -NoTypeInformation
+        } else {
+            Write-Verbose "No installed updates returned by Get-HotFix. Skipping CSV export."
+        }
+        if ($null -eq $htmlSections) { $htmlSections = @{} }
+        if ($updates -and $updates.Count -gt 0) {
+            $htmlSections['InstalledUpdates'] = $updates | ConvertTo-Html -Fragment -PreContent "<h2>Updates Installed</h2>"
+        } else {
+            $htmlSections['InstalledUpdates'] = "<h2>Updates Installed</h2><p>No installed updates were returned.</p>"
+        }
         Write-Host "Windows Updates - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to collect Windows Updates: $($_.Exception.Message)"
+        if ($null -eq $htmlSections) { $htmlSections = @{} }
         $htmlSections['InstalledUpdates'] = "<h2>Updates Installed</h2><p>Error collecting installed updates</p>"
     }
 
@@ -563,25 +603,38 @@ $csvUserRightsAssignments = Join-Path -Path $path -ChildPath "$ServerName-UserRi
         $updateSession = New-Object -ComObject Microsoft.Update.Session
         $updateSearcher = $updateSession.CreateUpdateSearcher()
         $missingupdatesResult = $updateSearcher.Search("IsInstalled=0")
-        $missingupdates = $missingupdatesResult.Updates | ForEach-Object {
-                    [PSCustomObject]@{
-                        "Missing Windows Update" = $_.Title
-                        "KB" = ($_.KBArticleIDs -join ", ")
-                        "Size (MB)" = [math]::Round($_.MaxDownloadSize / 1MB, 2)
-                    }
-                } 
+        $missingupdates = @($missingupdatesResult.Updates | ForEach-Object {
+            $sizeBytes = $null
+            try { $sizeBytes = $_.MaxDownloadSize } catch {}
+            [PSCustomObject]@{
+                "Missing Windows Update" = $_.Title
+                "KB" = ($_.KBArticleIDs -join ", ")
+                "Size (MB)" = if ($null -ne $sizeBytes) { [math]::Round(([double]$sizeBytes / 1MB), 2) } else { 0 }
+            }
+        })
         $csvmissingupdatesinfo = Join-Path -Path $Path -ChildPath "$ServerName-MissingUpdates.csv"
-        $missingupdates | Export-Csv -Path $csvmissingupdatesinfo -NoTypeInformation
-        $htmlSections['MissingUpdates'] = $missingupdates | ConvertTo-Html -Fragment -PreContent "<h2>Missing Windows Updates</h2>"
+        if ($missingupdates.Count -gt 0) {
+            $missingupdates | Export-Csv -Path $csvmissingupdatesinfo -NoTypeInformation
+        } else {
+            Write-Verbose "No missing updates found. Skipping CSV export."
+        }
+        if ($null -eq $htmlSections) { $htmlSections = @{} }
+        if ($missingupdates.Count -gt 0) {
+            $htmlSections['MissingUpdates'] = $missingupdates | ConvertTo-Html -Fragment -PreContent "<h2>Missing Windows Updates</h2>"
+        } else {
+            $htmlSections['MissingUpdates'] = "<h2>Missing Windows Updates</h2><p>No missing updates found.</p>"
+        }
         Write-Host "Missing Windows Updates - Completed" -ForegroundColor Green
     } catch {
         Write-Warning "Failed to check for Missing Windows Updates: $($_.Exception.Message)"
+        if ($null -eq $htmlSections) { $htmlSections = @{} }
         $htmlSections['MissingUpdates'] = "<h2>Missing Windows Updates</h2><p>Error checking for missing updates</p>"
     }
 
     Write-Host "=== SYSTEM INFORMATION COLLECTION COMPLETED ===" -ForegroundColor Green
 
     return $htmlSections
+}
 
 
 # Check if user selected to collect system information (system-only or all sections)
@@ -1712,6 +1765,51 @@ if ($collectSystemOnly) {
 } else {
     $assessmentCategories = "System, Network, Security, Scheduled Tasks, Startup Programs, and Logs"
 }
+
+# Report metadata and icons used in HTML
+$reportTitle = "Windows Server Assessment Report"
+$reportScope = switch ($menuChoice) {
+    '1' { 'System Only' }
+    '2' { 'Network Only' }
+    '3' { 'Security Only' }
+    '4' { 'Tasks/Startup/Logs Only' }
+    default { 'All Sections' }
+}
+
+# Precompute icon variables
+$iconChart = Get-IconHTML -IconName 'chart'
+$iconClipboard = Get-IconHTML -IconName 'clipboard'
+$iconComputer = Get-IconHTML -IconName 'computer'
+$iconServer = Get-IconHTML -IconName 'server'
+$iconGear = Get-IconHTML -IconName 'gear'
+$iconShield = Get-IconHTML -IconName 'shield'
+$iconNetwork = Get-IconHTML -IconName 'network'
+$iconLock = Get-IconHTML -IconName 'lock'
+$iconKey = Get-IconHTML -IconName 'key'
+$iconUser = Get-IconHTML -IconName 'user'
+$iconUsers = Get-IconHTML -IconName 'users'
+$iconFolder = Get-IconHTML -IconName 'folder'
+$iconClock = Get-IconHTML -IconName 'clock'
+$iconWarning = Get-IconHTML -IconName 'warning'
+$iconCheck = Get-IconHTML -IconName 'check'
+$iconCross = Get-IconHTML -IconName 'cross'
+$iconTarget = Get-IconHTML -IconName 'target'
+$iconMemory = Get-IconHTML -IconName 'memory'
+$iconDisk = Get-IconHTML -IconName 'disk'
+$iconCpu = Get-IconHTML -IconName 'cpu'
+$iconProcess = Get-IconHTML -IconName 'process'
+$iconService = Get-IconHTML -IconName 'service'
+$iconProgram = Get-IconHTML -IconName 'program'
+$iconPort = Get-IconHTML -IconName 'port'
+$iconFirewall = Get-IconHTML -IconName 'firewall'
+$iconAntivirus = Get-IconHTML -IconName 'antivirus'
+$iconCertificate = Get-IconHTML -IconName 'certificate'
+$iconDns = Get-IconHTML -IconName 'dns'
+$iconAudit = Get-IconHTML -IconName 'audit'
+$iconTask = Get-IconHTML -IconName 'task'
+$iconStartup = Get-IconHTML -IconName 'startup'
+$iconLog = Get-IconHTML -IconName 'log'
+$iconMenu = Get-IconHTML -IconName 'menu'
 
 $fullHtml = @"
 <!DOCTYPE html>

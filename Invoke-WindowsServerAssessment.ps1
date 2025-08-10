@@ -173,9 +173,7 @@ end {
         $done = Wait-Job -Job $inProgress -Any -Timeout 5
         if ($done) {
             foreach ($j in @($done)) {
-                try {
-                    Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -InformationAction SilentlyContinue | Out-Null
-                } catch { }
+                # Do not receive here; just move to completed list
                 $inProgress = $inProgress | Where-Object { $_.Id -ne $j.Id }
                 $completed += $j
             }
@@ -189,8 +187,12 @@ end {
         $remoteOut = $j.RemoteOut
         $localOut = $j.LocalOut
 
-    # Job already completed; receive without -Wait and suppress non-terminating errors
-    $payload = Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue
+        # Job already completed; receive without -Wait and capture errors silently
+        $payloadAll = $null
+        try {
+            $payloadAll = Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -InformationAction SilentlyContinue
+        } catch { }
+        $payload = if ($payloadAll -is [array]) { $payloadAll[-1] } else { $payloadAll }
         $success = $false
         $errorMsg = $null
         if ($payload -and $payload.Success) {
@@ -216,10 +218,17 @@ end {
             Invoke-Command -Session $sess -ScriptBlock { param($dir) if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -Path $dir } } -ArgumentList $sessionMap[$cn].RemoteTempDir -ErrorAction SilentlyContinue | Out-Null
         } catch { }
 
+        # Discover HTML report (pattern: <hostname>-SystemReport.html)
+        $htmlReport = $null
+        try {
+            $htmlReport = Get-ChildItem -LiteralPath $localOut -Filter '*-SystemReport.html' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+        } catch { }
+
         $results += [PSCustomObject]@{
             ComputerName = $cn
             Success      = $success
             LocalOutput  = $localOut
+            HtmlReport   = $htmlReport
             Error        = $errorMsg
         }
     }
