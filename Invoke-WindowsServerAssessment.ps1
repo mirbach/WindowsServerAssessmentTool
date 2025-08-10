@@ -131,16 +131,18 @@ process {
 
             # Start job on remote
             Write-Verbose "[$cn] Starting remote job..."
-            $job = Invoke-Command -Session $session -AsJob -ScriptBlock {
+        $job = Invoke-Command -Session $session -AsJob -ScriptBlock {
                 param($scriptPath, $outDir, $choice)
                 try {
                     if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
-                    & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -path $outDir -menuChoice $choice
-                    if ($LASTEXITCODE -ne 0) { throw "Script exit code $LASTEXITCODE" }
-                    return [PSCustomObject]@{ Success = $true; OutputDir = $outDir }
+            $console = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -path $outDir -menuChoice $choice 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { throw "Script exit code $LASTEXITCODE" }
+            # Check remote for a generated report
+            $html = Get-ChildItem -LiteralPath $outDir -Filter '*-SystemReport.html' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+            return [PSCustomObject]@{ Success = $true; OutputDir = $outDir; Html = $html; Console = $console }
                 }
                 catch {
-                    return [PSCustomObject]@{ Success = $false; Error = $_.Exception.Message; OutputDir = $outDir }
+            return [PSCustomObject]@{ Success = $false; Error = $_.Exception.Message; OutputDir = $outDir }
                 }
             } -ArgumentList @($sessionMap[$cn].RemoteScript, $remoteOut, $MenuChoice)
 
@@ -195,17 +197,32 @@ end {
         $payload = if ($payloadAll -is [array]) { $payloadAll[-1] } else { $payloadAll }
         $success = $false
         $errorMsg = $null
-        if ($payload -and $payload.Success) {
+        $consoleOut = $null
+    if ($payload -and $payload.Success) {
             $success = $true
+            if ($payload.PSObject.Properties.Match('Console').Count -gt 0) { $consoleOut = $payload.Console }
         }
         elseif ($payload) {
             $errorMsg = $payload.Error
+            if ($payload.PSObject.Properties.Match('Console').Count -gt 0) { $consoleOut = $payload.Console }
         }
 
-        if ($success) {
+    if ($success) {
             try {
-                # Pull artifacts
-                Copy-Item -FromSession $sess -Path (Join-Path $remoteOut '*') -Destination $localOut -Recurse -Force -ErrorAction Stop
+                # Check if any files were generated
+                $hasFiles = $false
+                try {
+                    $fileCount = Invoke-Command -Session $sess -ScriptBlock { param($p) if (Test-Path -LiteralPath $p) { (Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count } else { 0 } } -ArgumentList $remoteOut -ErrorAction Stop
+                    if ($fileCount -and $fileCount -gt 0) { $hasFiles = $true }
+                } catch { $hasFiles = $false }
+
+                if ($hasFiles) {
+                    # Pull artifacts (copy contents). Use wildcard only when files exist.
+                    Copy-Item -FromSession $sess -Path (Join-Path $remoteOut '*') -Destination $localOut -Recurse -Force -ErrorAction Stop
+                } else {
+                    $success = $false
+            $errorMsg = 'Remote run completed but no files were generated.'
+                }
             }
             catch {
                 $success = $false
@@ -219,7 +236,7 @@ end {
         } catch { }
 
         # Discover HTML report (pattern: <hostname>-SystemReport.html)
-        $htmlReport = $null
+    $htmlReport = $null
         try {
             $htmlReport = Get-ChildItem -LiteralPath $localOut -Filter '*-SystemReport.html' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
         } catch { }
@@ -230,6 +247,7 @@ end {
             LocalOutput  = $localOut
             HtmlReport   = $htmlReport
             Error        = $errorMsg
+            Console      = $consoleOut
         }
     }
 
