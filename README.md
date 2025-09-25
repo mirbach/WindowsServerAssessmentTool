@@ -1,9 +1,11 @@
 # Windows Server Assessment Tool
 
 ## Overview
+
 The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShell tool designed to perform detailed assessments on Windows Server systems. It features a modern, collapsible HTML interface with interactive navigation and provides a menu-driven selection system that allows users to selectively collect different types of system information. The tool generates professional HTML reports with corresponding CSV data exports for in-depth analysis.
 
 ## Key Features
+
 - **Modern Interactive HTML Reports**: Collapsible left navigation menu with icons and smooth animations
 - **Menu-Driven Assessment Modes**: Five targeted assessment options for focused data collection  
 - **Professional UI/UX**: Responsive design with color-coded sections and hover effects
@@ -13,8 +15,34 @@ The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShel
 - **Comprehensive CSV Exports**: Detailed data files for external analysis and reporting
 - **Modular Architecture**: Efficient function-based design for optimal performance
 
+## Code signing and packaging
+
+- Sign scripts with your code-signing cert:
+   - Configure a certificate: either import a PFX to CurrentUser\My or provide `-PfxPath` when running the tool.
+   - From VS Code: run task "Sign: Sign scripts (Thumbprint)" and replace `[YOUR_CERT_THUMBPRINT]` in `.vscode/tasks.json`.
+   - Or run manually:
+      - pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Sign-Code.ps1 -Thumbprint [THUMBPRINT] -Path . -Recurse -SkipValid
+
+- Verify signatures:
+   - From VS Code: run task "Sign: Verify scripts".
+   - Or run manually:
+      - pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Sign-Code.ps1 -VerifyOnly -Path . -Recurse
+
+- Build an .exe with PS2EXE (optional):
+   - From VS Code: run task "Build: UI EXE (PS2EXE)" to produce `dist/WSAT-UI.exe`.
+   - Or run manually:
+      - pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-Exe.ps1 -InputPath .\WindowsServerAssessmentTool_UI.ps1 -Output .\dist\WSAT-UI.exe -NoConsole -Sta
+
+Notes:
+
+- Requires Windows PowerShell 5.1+.
+- PS2EXE is installed from PSGallery if missing.
+- Signing uses SHA256 and timestamps via DigiCert by default.
+
 ## Recent Improvements (Latest Version)
+
 ### Enhanced User Experience
+
 - **User-Friendly Column Names**: All major sections now use PSCustomObject with descriptive column headers instead of technical property names
 - **Responsive Table Design**: Wide tables automatically scroll horizontally and resize appropriately
 - **Dynamic Report Content**: "Key Areas Assessed" and "Assessment Categories" sections now dynamically reflect the user's menu selection
@@ -22,11 +50,13 @@ The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShel
 - **Search Functionality Removed**: Removed search input from "Running Windows Services" section for cleaner interface
 
 ### Technical Enhancements
+
 - **Enhanced Error Handling**: Improved error handling throughout all collection functions
 - **Optimized Data Processing**: Better memory management and performance optimization
 - **Consistent Output Format**: Standardized HTML table formatting across all sections
 
 ## Version Information
+
 - **File Name:** WindowsServerAssessmentTool_V1.0.ps1
 - **Author:** Abdullah Zmaili
 - **Version:** 1.0
@@ -36,6 +66,7 @@ The **WindowsServerAssessmentTool_V1.0.ps1** script is a comprehensive PowerShel
 ## Features
 
 ### Interactive HTML Report Features
+
 The generated HTML reports include:
 
 1. **Modern Collapsible Navigation**
@@ -65,6 +96,7 @@ The generated HTML reports include:
    - Dynamic report sections based on user selection
 
 ### Menu-Driven Selection
+
 The script offers five distinct assessment modes:
 
 1. **SYSTEM INFORMATION ONLY**
@@ -98,13 +130,16 @@ The script offers five distinct assessment modes:
 ### Output Files Generated
 
 #### HTML Reports
+
 - **Main Report:** `[ServerName]-SystemReport.html` - Comprehensive HTML assessment report based on selected mode
 - **GPO Settings:** `[ServerName]-GPOSettings.html` - Group Policy Objects details (when applicable)
 
 #### CSV Data Files
+
 The script generates targeted CSV files based on the selected assessment mode:
 
 **System Information Assessment Mode:**
+
 - `[ServerName]-OSInfo.csv`
 - `[ServerName]-CPUInfo.csv`
 - `[ServerName]-CPUUsage.csv`
@@ -120,11 +155,13 @@ The script generates targeted CSV files based on the selected assessment mode:
 - `[ServerName]-MissingUpdates.csv`
 
 **Network Assessment Mode:**
+
 - `[ServerName]-NICInfo.csv`
 - `[ServerName]-TrafficInfo.csv`
 - `[ServerName]-OpenPorts.csv`
 
 **Security Assessment Mode:**
+
 - `[ServerName]-AVSettings.csv`
 - `[ServerName]-FirewallStatus.csv`
 - `[ServerName]-FirewallSettings.csv`
@@ -144,6 +181,7 @@ The script generates targeted CSV files based on the selected assessment mode:
 - `[ServerName]-DefenderExploit.csv`
 
 **Tasks & Logs Assessment Mode:**
+
 - `[ServerName]-StartupProgs.csv`
 - `[ServerName]-ScheduledTasks.csv`
 - `[ServerName]-EventViewerLogs.csv`
@@ -154,12 +192,15 @@ The script generates targeted CSV files based on the selected assessment mode:
 ## Usage Instructions
 
 ### Prerequisites
+
 1. **PowerShell Version:** Ensure PowerShell 5.1 or later is installed
 2. **Administrator Rights:** Run PowerShell as Administrator for comprehensive data collection
 3. **Execution Policy:** Set execution policy to allow script execution:
+
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
+
 
 ### Running the Script
 
@@ -167,14 +208,18 @@ The script generates targeted CSV files based on the selected assessment mode:
    - Right-click on PowerShell and select "Run as Administrator"
 
 2. **Navigate to Script Location**
+
    ```powershell
    cd "C:\temp\WindowsServerAssessmentTool"
    ```
 
+
 3. **Execute the Script**
+
    ```powershell
    .\WindowsServerAssessmentTool_V1.0.ps1
    ```
+
 
 4. **Specify Output Directory**
    - When prompted, enter the full path where you want to save the assessment reports (e.g., `C:\temp`)
@@ -184,7 +229,7 @@ The script generates targeted CSV files based on the selected assessment mode:
    - Choose from the 5 available options:
      - Enter `1` for System Information Assessment Only
      - Enter `2` for Network Assessment Only
-     - Enter `3` for Security Assessment Only 
+   - Enter `3` for Security Assessment Only
      - Enter `4` for Tasks & Logs Assessment Only
      - Enter `5` for Complete Server Assessment
 
@@ -195,7 +240,9 @@ The script generates targeted CSV files based on the selected assessment mode:
 ### Understanding the Output
 
 #### HTML Assessment Report Structure
+
 The HTML assessment report includes:
+
 - **Executive Summary Dashboard:** Key metrics overview with visual indicators
 - **Interactive Navigation Menu:** Collapsible left sidebar with icons and section counters
 - **Dynamic Content Sections:** Report content automatically reflects selected assessment mode
@@ -206,12 +253,14 @@ The HTML assessment report includes:
 - **Print-Friendly Layout:** Optimized for both screen viewing and printing
 
 #### Improved Data Presentation
+
 - **User-Friendly Column Names:** All tables use descriptive headers instead of technical property names
 - **Responsive Tables:** Wide tables automatically include horizontal scrolling and proper sizing
 - **Dynamic Sections:** "Key Areas Assessed" and "Assessment Categories" reflect your menu selection
 - **Professional Formatting:** Proper capitalization and clean styling throughout
 
 #### CSV Files
+
 - Each CSV file contains raw data for specific system components
 - Files can be imported into Excel or other tools for further analysis
 - Only relevant CSV files are generated based on the selected assessment mode
@@ -219,7 +268,9 @@ The HTML assessment report includes:
 ## Script Architecture
 
 ### Modern HTML Interface
+
 The script generates HTML reports with:
+
 - **Collapsible Navigation Menu:** Modern left-aligned sidebar with smooth animations
 - **Interactive Elements:** Clickable sections with hover effects and transitions
 - **Professional Styling:** Gradient backgrounds, icon integration, and responsive design
@@ -230,23 +281,29 @@ The script generates HTML reports with:
 - **Dynamic Content:** Report sections automatically adjust based on user's menu selection
 
 ### Modular Design
+
 The script is built with a modular architecture featuring:
+
 - **Separate Functions:** Individual functions for each assessment area
 - **Conditional Logic:** Smart data collection based on user selection
 - **Error Handling:** Graceful handling of assessment failures
 - **Progress Reporting:** Real-time feedback during execution
 
 ### Key Functions
+
 1. **Get-SystemInformation:** Collects comprehensive system details
 2. **Get-NetworkInformation:** Gathers network configuration and statistics
 3. **Get-SecurityInformation:** Retrieves security settings and configurations
 4. **Get-TasksStartupLogsInformation:** Collects startup programs, tasks, and logs
 
 ### Data Presentation Enhancements
+
 The script now provides significantly improved data presentation:
 
 #### PSCustomObject Implementation
+
 All major sections now use PSCustomObject with user-friendly column names:
+
 - **Antivirus Settings**: "AV Enabled", "Real Time Protection", "Behavior Monitor" (instead of technical property names)
 - **SMB Shares**: "Share Name", "Share Path", "Share Type", "Folder Enumeration Mode"
 - **Updates Installed**: "Update Title", "Installation Date", "Update Size (MB)", "Description"
@@ -258,17 +315,20 @@ All major sections now use PSCustomObject with user-friendly column names:
 - **Event Viewer Logs**: "Log Name", "Maximum Log Size (KB)", "Overflow Action", "Minimum Retention (Days)"
 
 #### Responsive Table Design
+
 - **Wide Tables**: Automatically wrapped in responsive containers with horizontal scrolling
 - **Professional Styling**: Modern table headers with proper capitalization
 - **Auto-sizing**: Tables adjust to content width while maintaining readability
 - **Mobile-Friendly**: Responsive design works across different screen sizes
 
 #### Dynamic Report Content
+
 - **Assessment Categories**: Dynamically shows "System Information", "Network Configuration", "Security Assessment", etc. based on menu selection
 - **Key Areas Assessed**: Content automatically reflects the chosen assessment mode
 - **Section Counts**: Navigation menu shows accurate section counts for selected mode
 
 ### Performance Considerations
+
 - **Selective Assessment:** Only gathers data for selected sections
 - **Optimized Queries:** Efficient WMI and PowerShell cmdlet usage
 - **Memory Management:** Proper variable cleanup and resource management
@@ -277,6 +337,7 @@ All major sections now use PSCustomObject with user-friendly column names:
 ## Troubleshooting
 
 ### HTML Report Navigation Issues
+
 1. **Navigation Menu Not Responding**
    - **Solution:** Ensure JavaScript is enabled in your browser
    - **Alternative:** Use a modern browser (Chrome, Firefox, Edge)
@@ -304,6 +365,7 @@ All major sections now use PSCustomObject with user-friendly column names:
    - **Solution:** Use browser's print preview and adjust print settings
 
 ### Performance Tips
+
 - Use specific assessment modes for faster execution
 - Ensure sufficient disk space in the output directory
 - Close unnecessary applications to free up system resources
@@ -335,12 +397,14 @@ All major sections now use PSCustomObject with user-friendly column names:
 
 ### Data Sensitivity
 The script collects various types of sensitive information:
+
 - **System Configuration:** Hardware and software details
 - **Security Settings:** Firewall rules, antivirus status, user accounts
 - **Network Information:** IP configurations, open ports, traffic statistics
 - **Event Logs:** System events, security events, application logs
 
 ### Best Practices
+
 1. **Secure Storage:** Store assessment output files in secure locations
 2. **Access Control:** Limit access to generated assessment reports
 3. **Data Retention:** Implement appropriate data retention policies
@@ -351,16 +415,19 @@ The script collects various types of sensitive information:
 
 ### Modifying Assessment Scope
 To customize what information is assessed:
+
 1. Edit the respective `Get-*Information` functions
 2. Add or remove specific data collection commands
 3. Modify the CSV export sections as needed
 
 ### Changing Output Formats
+
 - **HTML Styling:** Modify the CSS section in the HTML generation area
 - **CSV Structure:** Adjust the `Select-Object` statements in collection functions
 - **Additional Formats:** Add JSON or XML export options if needed
 
 ### Adding New Assessments
+
 1. Create new collection logic within existing functions
 2. Add corresponding CSV export paths
 3. Update HTML generation sections
@@ -369,14 +436,17 @@ To customize what information is assessed:
 ## Maintenance and Updates
 
 ### Regular Maintenance
+
 - **Monthly Review:** Check for new Windows updates that might affect assessment
 - **Quarterly Updates:** Review and update collection queries for new system features
 - **Annual Overhaul:** Consider adding new sections based on evolving security requirements
 
 ### Version History
+
 - **V1.0 (June 2025):** Initial release with menu-driven selective assessment, enhanced user interface, and improved data presentation
 
 ### Recent Updates (Current Version)
+
 - **Enhanced Data Presentation:** Implemented PSCustomObject throughout all major sections for user-friendly column names
 - **Responsive Table Design:** Added table containers with horizontal scrolling for wide data sets
 - **Dynamic Report Content:** Assessment Categories and Key Areas Assessed sections now reflect user's menu selection
@@ -385,7 +455,9 @@ To customize what information is assessed:
 - **Better Error Handling:** Enhanced error handling and performance optimization throughout
 
 ### Future Enhancements
+
 Potential improvements for future versions:
+
 - **Remote Assessment:** Support for remote server assessments
 - **Scheduled Execution:** Built-in task scheduler integration  
 - **Email Reports:** Automatic email delivery of assessment reports
@@ -398,6 +470,7 @@ Potential improvements for future versions:
 ## Support and Contact
 
 For questions, issues, or enhancement requests:
+
 - **Author:** Abdullah Zmaili
 - **Created:** June 16, 2025
 - **Version:** WindowsServerAssessmentTool_V1.0

@@ -1,0 +1,98 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Sign: Verify scripts",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/Sign-Code.ps1",
+        "-VerifyOnly",
+        "-Path","${workspaceFolder}",
+        "-Recurse"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Sign: Sign scripts (Thumbprint)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/Sign-Code.ps1",
+        "-Thumbprint","<YOUR_CERT_THUMBPRINT>",
+        "-Path","${workspaceFolder}",
+        "-Recurse",
+        "-SkipValid"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: UI EXE (PS2EXE)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/Build-Exe.ps1",
+        "-InputPath","${workspaceFolder}/WindowsServerAssessmentTool_UI.ps1",
+        "-Output","${workspaceFolder}/dist/WSAT-UI.exe",
+        "-NoConsole",
+        "-Sta",
+        "-Title","Windows Server Assessment UI"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: CLI EXE (Assessment V1.0)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/Build-Exe.ps1",
+        "-InputPath","${workspaceFolder}/WindowsServerAssessmentTool_V1.0.ps1",
+        "-Output","${workspaceFolder}/dist/WSAT-CLI.exe",
+        "-Title","Windows Server Assessment CLI"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: Orchestrator EXE (PS2EXE)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/Build-Exe.ps1",
+        "-InputPath","${workspaceFolder}/Invoke-WindowsServerAssessment.ps1",
+        "-Output","${workspaceFolder}/dist/WSAT-Orchestrator.exe",
+        "-Title","Windows Server Assessment Orchestrator"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: Dashboard EXE (PS2EXE)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/Build-Exe.ps1",
+        "-InputPath","${workspaceFolder}/Build-FleetDashboard.ps1",
+        "-Output","${workspaceFolder}/dist/WSAT-Dashboard.exe",
+        "-Title","Windows Server Assessment Dashboard Builder"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

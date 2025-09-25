@@ -576,9 +576,18 @@ foreach ($dir in $hostDirs) {
 }
 
 # Save JSON
-$json = $fleet | ConvertTo-Json -Depth 6 -Compress
+$useCompress = $false
+try { if ($PSVersionTable.PSVersion.Major -ge 6) { $useCompress = $true } } catch { $useCompress = $false }
+if ($useCompress) {
+    $json = $fleet | ConvertTo-Json -Depth 6 -Compress
+} else {
+    $json = $fleet | ConvertTo-Json -Depth 6
+}
 $msBaseline = Build-MsBaseline -Path $msBaselinePath
-$baselineJson = if ($msBaseline) { $msBaseline | ConvertTo-Json -Depth 6 -Compress } else { 'null' }
+if ($msBaseline) {
+    if ($useCompress) { $baselineJson = $msBaseline | ConvertTo-Json -Depth 6 -Compress }
+    else { $baselineJson = $msBaseline | ConvertTo-Json -Depth 6 }
+} else { $baselineJson = 'null' }
 $fleetPath = Join-Path -Path $RootPath -ChildPath 'fleet.json'
 Set-Content -LiteralPath $fleetPath -Value $json -Encoding UTF8
 

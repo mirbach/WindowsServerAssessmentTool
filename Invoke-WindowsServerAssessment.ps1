@@ -95,45 +95,91 @@ begin {
     $sessionMap = @{}
     $tempName = ('WSAT_{0:yyyyMMdd_HHmmss}_{1}' -f (Get-Date), [System.Guid]::NewGuid().ToString('N'))
 
+    # TrustedHosts management for LAPS connections
+    $originalTrustedHosts = $null
+    $trustedHostsModified = $false
+
     function Get-TargetLapsCredential {
         param(
-            [Parameter(Mandatory)][string]$ComputerName,
-            [string]$AccountOverride
+            [Parameter(Mandatory)][string]$ComputerName
         )
         # Try Windows LAPS first (Get-LapsADPassword)
         $lapsAD = Get-Command -Name Get-LapsADPassword -ErrorAction SilentlyContinue
         if ($lapsAD) {
-            try {
-                $res = Get-LapsADPassword -ComputerName $ComputerName -AsPlainText -IncludePassword -ErrorAction Stop
-                if ($res) {
-                    $pwdPlain = [string]$res.Password
-                    $acctName = if ($res.Account) { [string]$res.Account } elseif ($AccountOverride) { [string]$AccountOverride } else { 'Administrator' }
-                    $sec = ConvertTo-SecureString -String $pwdPlain -AsPlainText -Force
-                    # Use "ComputerName\User" form for local account auth over WinRM
-                    $user = ("{0}\\{1}" -f $ComputerName, $acctName)
-                    return [PSCredential]::new($user, $sec)
-                }
-            } catch {}
+            # Extract short name from FQDN if needed
+            $shortName = $ComputerName
+            if ($ComputerName -like '*.*') {
+                $shortName = $ComputerName.Split('.')[0]
+            }
+            # Try with short name first (since manual command works), then FQDN
+            foreach ($name in @($shortName, $ComputerName)) {
+                try {
+                    $res = Get-LapsADPassword -Identity $name -AsPlainText
+                    if ($res -and $res.Password) {
+                        $pwdPlain = [string]$res.Password
+                        $acctName = if ($res.Account) { [string]$res.Account } else { 'Administrator' }
+                        $sec = ConvertTo-SecureString -String $pwdPlain -AsPlainText -Force
+                        $user = ".\$acctName"  # Use local account format for authentication
+                        return (New-Object System.Management.Automation.PSCredential($user, $sec))
+                    }
+                } catch {}
+            }
         }
         # Legacy LAPS (AdmPwd.PS)
         $legacy = Get-Command -Name Get-AdmPwdPassword -ErrorAction SilentlyContinue
         if ($legacy) {
-            try {
-                $res = Get-AdmPwdPassword -ComputerName $ComputerName -ErrorAction Stop
-                if ($res) {
-                    $pwdPlain = [string]$res.Password
-                    $acctName = if ($AccountOverride) { [string]$AccountOverride } else { 'Administrator' }
-                    $sec = ConvertTo-SecureString -String $pwdPlain -AsPlainText -Force
-                    $user = ("{0}\\{1}" -f $ComputerName, $acctName)
-                    return [PSCredential]::new($user, $sec)
-                }
-            } catch {}
+            # Extract short name from FQDN if needed
+            $shortName = $ComputerName
+            if ($ComputerName -like '*.*') {
+                $shortName = $ComputerName.Split('.')[0]
+            }
+            # Try with short name first, then FQDN
+            foreach ($name in @($shortName, $ComputerName)) {
+                try {
+                    $res = Get-AdmPwdPassword -ComputerName $name -ErrorAction Stop
+                    if ($res) {
+                        $pwdPlain = [string]$res.Password
+                        $acctName = 'Administrator'  # Legacy LAPS typically uses Administrator
+                        $sec = ConvertTo-SecureString -String $pwdPlain -AsPlainText -Force
+                        $user = ".\$acctName"  # Use local account format for authentication
+                        return (New-Object System.Management.Automation.PSCredential($user, $sec))
+                    }
+                } catch {}
+            }
         }
         throw "Failed to retrieve LAPS password for $ComputerName. Ensure LAPS module is installed and you have read permissions."
     }
 }
 
 process {
+    # Manage TrustedHosts for LAPS connections
+    if ($UseLaps) {
+        try {
+            $originalTrustedHosts = (Get-Item -Path WSMan:\localhost\Client\TrustedHosts -ErrorAction Stop).Value
+            Write-Verbose "Original TrustedHosts: $originalTrustedHosts"
+            
+            # Add target computers to TrustedHosts
+            $currentHosts = if ($originalTrustedHosts) { $originalTrustedHosts -split ',' | ForEach-Object { $_.Trim() } } else { @() }
+            $newHosts = @()
+            
+            foreach ($cn in $ComputerName) {
+                if ($currentHosts -notcontains $cn) {
+                    $newHosts += $cn
+                }
+            }
+            
+            if ($newHosts.Count -gt 0) {
+                $updatedHosts = $currentHosts + $newHosts
+                $trustedHostsString = $updatedHosts -join ','
+                Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $trustedHostsString -Force
+                $trustedHostsModified = $true
+                Write-Verbose "Added to TrustedHosts: $($newHosts -join ', ')"
+            }
+        } catch {
+            Write-Warning "Failed to modify TrustedHosts: $($_.Exception.Message). WinRM connections may fail due to certificate validation."
+        }
+    }
+
     foreach ($cn in $ComputerName) {
         # Create a per-target local output folder
         $localOut = Join-Path -Path $OutputRoot -ChildPath $cn
@@ -151,8 +197,9 @@ process {
             if ($Credential) { $splat.Credential = $Credential }
             elseif ($UseLaps) {
                 try {
-                    $lapsCred = Get-TargetLapsCredential -ComputerName $cn -AccountOverride $LapsAccountName
+                    $lapsCred = Get-TargetLapsCredential -ComputerName $cn
                     $splat.Credential = $lapsCred
+                    # Use default authentication (don't force Negotiate for local accounts)
                 } catch {
                     Write-Warning "[$cn] LAPS credential retrieval failed: $($_.Exception.Message)"; throw
                 }
@@ -308,6 +355,16 @@ end {
     # Close sessions
     if ($sessionMap.Count -gt 0) {
         try { Remove-PSSession -Session ($sessionMap.Values | ForEach-Object { $_.Session }) -ErrorAction SilentlyContinue } catch { }
+    }
+
+    # Restore TrustedHosts if modified
+    if ($trustedHostsModified -and $null -ne $originalTrustedHosts) {
+        try {
+            Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $originalTrustedHosts -Force
+            Write-Verbose "Restored original TrustedHosts: $originalTrustedHosts"
+        } catch {
+            Write-Warning "Failed to restore TrustedHosts: $($_.Exception.Message)"
+        }
     }
 
     # Emit summary
